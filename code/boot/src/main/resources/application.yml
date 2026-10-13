@@ -1,0 +1,47 @@
+spring:
+  cache:
+    type: caffeine
+    cache-names: ifbbEvents
+    caffeine:
+      # In-memory cache per instance. recordStats exposes hit/miss metrics via Actuator/Prometheus.
+      spec: maximumSize=500,expireAfterWrite=6h,recordStats
+
+rest-clients:
+  ifbb-pro:
+    base-url: https://www.ifbbpro.com
+    connect-timeout: 2s
+    read-timeout: 5s
+    # Value documented in the IFBB consumer contract (ifbb-pro-api.yaml).
+    user-agent: KimAngelWebsite/1.0
+    page-size: 50
+    max-pages: 200
+
+resilience4j:
+  retry:
+    instances:
+      # Applied per page in IfbbEventsClient. Only transient failures are retried, as the IFBB
+      # contract states: 429, 5xx and network errors. Other 4xx fail immediately.
+      ifbbEventsApi:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
+          - org.springframework.web.client.ResourceAccessException
+  circuitbreaker:
+    instances:
+      ifbbEventsApi:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        # Only provider unavailability opens the circuit; a 4xx caused by our request does not.
+        record-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
+          - org.springframework.web.client.ResourceAccessException

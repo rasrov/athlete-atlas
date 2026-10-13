@@ -1,0 +1,205 @@
+openapi: 3.0.3
+info:
+  title: IFBB Pro Events API — Consumer Contract
+  version: 1.0.0
+  description: Unofficial consumer contract reconstructed from scripts/update_competitions.py and its
+    fixtures. Covers only the request and response subset used by this project, not the complete provider
+    API. The provider is the WordPress plugin The Events Calendar; this contract was checked on 2026-10-13
+    against its published spec (/wp-json/tribe/events/v1/doc) and a live response. That spec declares
+    no required Event properties and documents /events as a bare array, while the live API returns the
+    EventPage object described here. Extra provider fields are allowed. Required properties on page-level
+    schemas describe the consumer expectations; Event properties are optional and invalid events are
+    discarded by the importer. Examples are fictional. This external paginated API is separate from our
+    unpaginated athlete competition endpoint.
+servers:
+  - url: https://www.ifbbpro.com
+security: [ ]
+tags:
+  - name: IfbbEvents
+    description: External IFBB Pro event catalog
+paths:
+  /wp-json/tribe/events/v1/events:
+    get:
+      operationId: listIfbbEvents
+      tags:
+        - IfbbEvents
+      summary: Fetch one page of IFBB Pro events
+      description: 'The project sends Accept: application/json and User-Agent: KimAngelWebsite/1.0 with
+        no API credentials. Fetch every page before applying local selection. No provider-side category,
+        division or Natural exclusion query is used. Error payloads have not been verified and are intentionally
+        unspecified.'
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: '2026-01-01'
+          description: Lower date bound sent by the importer. Currently fixed to January 1, 2026. Required
+            here to reproduce the project request, not a claim about provider defaults.
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: '2027-10-01'
+          description: Upper date bound sent by the importer. Currently October 1, 2027; advances to October
+            1 of the next year on each October 1 starting in 2027. Provider boundary semantics have not
+            been verified independently. Required here to reproduce the project request, not a claim about
+            provider defaults.
+        - name: per_page
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 50
+          description: The importer always sends 50. This example is not a documented provider default or
+            maximum.
+        - name: page
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+          description: One-based page number. The importer fetches all reported pages, with a local safety
+            limit of 200 pages.
+      responses:
+        '200':
+          description: Provider page before local filtering. Additional response fields are allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+              example:
+                events:
+                  - id: 90001
+                    title: 2027 Example &amp; Pro
+                    description: <p>Classic Physique</p>
+                    categories:
+                      - slug: professional
+                    start_date: '2027-09-30 00:00:00'
+                    end_date: '2027-10-01 23:59:59'
+                    venue:
+                      city: Madrid
+                      country: Spain
+                    image: false
+                    url: https://www.ifbbpro.com/competition/example/
+                total: 1
+                total_pages: 1
+        '429':
+          description: Rate limited. The importer retries; response body is unspecified.
+        default:
+          description: Unspecified provider error. The importer retries HTTP 5xx and fails immediately
+            on other HTTP 4xx except 429. No application/problem+json payload is assumed.
+components:
+  schemas:
+    LocalEventDateTime:
+      type: string
+      pattern: ^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$
+      example: '2027-09-30 00:00:00'
+      description: Local event date and time without a UTC offset. This is not RFC 3339 date-time. The
+        importer validates the calendar date and keeps the date portion without UTC conversion.
+    Category:
+      type: object
+      required:
+        - slug
+      additionalProperties: true
+      properties:
+        slug:
+          type: string
+          example: professional
+    Venue:
+      type: object
+      nullable: true
+      additionalProperties: true
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+      description: Missing or blank city or country is normalized to null. Additional provider fields
+        are allowed.
+    EventImage:
+      type: object
+      nullable: true
+      additionalProperties: true
+      properties:
+        url:
+          type: string
+          description: Provider image URL; may identify a poster rather than a logo. Missing URL becomes
+            an empty string.
+    Event:
+      type: object
+      additionalProperties: true
+      description: All properties are optional, as in the provider spec. The importer expects id, title,
+        description, url, start_date and end_date, and discards events missing any of them or with a
+        non-positive id, unparseable dates or end_date before start_date.
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+          description: Provider title; may contain HTML entities.
+        description:
+          type: string
+          description: Provider HTML description. The importer extracts plain text before checking divisions.
+            May be an empty string (observed on Pro Qualifier events); an empty description is kept, not
+            discarded.
+        url:
+          type: string
+          format: uri
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        start_date:
+          $ref: '#/components/schemas/LocalEventDateTime'
+        end_date:
+          $ref: '#/components/schemas/LocalEventDateTime'
+        venue:
+          description: Optional. The importer accepts an object, false, null or an empty array as the
+            provider venue representation.
+          anyOf:
+            - $ref: '#/components/schemas/Venue'
+            - type: boolean
+              enum:
+                - false
+            - type: array
+              maxItems: 0
+              items:
+                type: object
+        image:
+          description: Optional. The importer accepts an object, false or null. This is not the editorial
+            logo mapping.
+          anyOf:
+            - $ref: '#/components/schemas/EventImage'
+            - type: boolean
+              enum:
+                - false
+    EventPage:
+      type: object
+      additionalProperties: true
+      required:
+        - events
+        - total
+        - total_pages
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        total:
+          type: integer
+          minimum: 0
+          description: Total provider events before local division/category filtering.
+        total_pages:
+          type: integer
+          minimum: 0
+          description: Total provider pages. The current importer rejects empty results and more than
+            200 pages to preserve the previous snapshot.

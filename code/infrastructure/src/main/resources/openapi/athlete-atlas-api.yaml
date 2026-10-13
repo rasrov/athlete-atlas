@@ -3,28 +3,30 @@ info:
   title: Athlete Public API
   version: 0.1.0
   description:
-    This API provides athlete-related data for public consumption. It includes endpoints for retrieving competition
-    participation, Instagram posts, YouTube videos, and sponsor information. The API is designed to be used
-    by frontend applications and other services that require athlete data.
+    Athlete Public API provides athlete competition calendars, social media posts and videos, and sponsor
+    relationships. The API is read-only and does not require authentication. It is intended for public
+    consumption by websites, apps and other services. The API is hosted on GitHub Pages and does not
+    implement the backend origin; the proposed path is relative to the backend origin.
 servers:
-- url: 'http://localhost:8080'
-  description: Local development server
-security: []
+  - url: /api/v1
+    description: Proposed path relative to the backend origin; hosting and domain are not configured. GitHub
+      Pages does not implement this API.
+security: [ ]
 tags:
-- name: Competition
-  description: Competition calendar and editorial participation decisions
-- name: InstagramPost
-  description: Instagram posts and preview images
-- name: YouTubeVideo
-  description: YouTube video metadata and links
-- name: Sponsor
-  description: Athlete sponsors and discount codes
+  - name: Competition
+    description: Competition calendar and editorial participation decisions
+  - name: InstagramPost
+    description: Instagram posts and preview images
+  - name: YouTubeVideo
+    description: YouTube video metadata and links
+  - name: Sponsor
+    description: Athlete sponsors and discount codes
 paths:
   /api/v1/athletes/{athleteId}/competitions:
     get:
       operationId: listAthleteCompetitions
       tags:
-      - Competition
+        - Competition
       summary: List competitions with athlete participation
       description: Sort by startDate ascending, then id ascending. Include professional Classic Physique
         events; exclude names containing natural and Natural/Naturals words in Classic Physique division
@@ -34,52 +36,40 @@ paths:
         (exclusive). Determine the current year once per request using Europe/Madrid, including requests
         made before September. For requests in 2026, windowStart is 2026-09-01 and windowEndExclusive
         is 2027-09-01. Include overlapping events when endDate >= windowStart and startDate < windowEndExclusive;
-        event endDate remains inclusive. Apply this window and participationStatus with AND before counting
-        and pagination. Only limit, offset and participationStatus query parameters are supported; reject
-        from, to and any other query parameter with 400.
+        event endDate remains inclusive. Apply this window and participationStatus with AND. Return all
+        matching events in one response, without pagination, truncation or an item-count cap. Only the
+        participationStatus query parameter is supported; reject limit, offset, from, to and any other
+        query parameter with 400.
       parameters:
-      - $ref: '#/components/parameters/AthleteId'
-      - name: limit
-        in: query
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 50
-      - $ref: '#/components/parameters/Offset'
-      - name: participationStatus
-        in: query
-        schema:
-          $ref: '#/components/schemas/ParticipationStatus'
-        description: Omit to include all statuses. Use confirmed to select competitions where the athlete
-          participates.
+        - $ref: '#/components/parameters/AthleteId'
+        - name: participationStatus
+          in: query
+          schema:
+            $ref: '#/components/schemas/ParticipationStatus'
+          description: Omit to include all statuses. Use confirmed to select competitions where the athlete
+            participates.
       responses:
         '200':
-          description: Available collection; data may be empty. Fictional example, not evidence of actual
-            results or sponsorship agreements.
+          description: All matching competitions in the fixed annual window, without pagination; data
+            may be empty. Fictional example.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CompetitionCollection'
               example:
                 data:
-                - id: competition-example-2026
-                  name: Example Pro 2026
-                  startDate: '2026-10-10'
-                  endDate: '2026-10-11'
-                  city: Madrid
-                  country: Spain
-                  description: Classic Physique
-                  sourceUrl: https://www.ifbbpro.com/competition/example/
-                  sourceId: '12345'
-                  logoUrl: null
-                  participation:
-                    status: pending
-                pagination:
-                  limit: 50
-                  offset: 0
-                  total: 1
-                  hasMore: false
+                  - id: competition-example-2026
+                    name: Example Pro 2026
+                    startDate: '2026-10-10'
+                    endDate: '2026-10-11'
+                    city: Madrid
+                    country: Spain
+                    description: Classic Physique
+                    sourceUrl: https://www.ifbbpro.com/competition/example/
+                    sourceId: '12345'
+                    logoUrl: null
+                    participation:
+                      status: pending
                 meta:
                   athleteId: kim-angel
                   updatedAt: null
@@ -96,7 +86,7 @@ paths:
     get:
       operationId: listAthleteInstagramPosts
       tags:
-      - InstagramPost
+        - InstagramPost
       summary: Get the latest 3 Instagram posts
       description: Return exactly 3 distinct eligible posts from the latest complete synchronized selection,
         ordered by publishedAt descending, then id ascending. No query parameters are supported; reject
@@ -106,7 +96,7 @@ paths:
         the previous complete selection as stale or return 503 when no complete selection exists. Never
         return a partial or empty 200 response.
       parameters:
-      - $ref: '#/components/parameters/AthleteId'
+        - $ref: '#/components/parameters/AthleteId'
       responses:
         '200':
           description: Exactly 3 distinct items in the complete selection. Preview images may be null;
@@ -117,21 +107,21 @@ paths:
                 $ref: '#/components/schemas/InstagramPostCollection'
               example:
                 data:
-                - id: '12345678901234567'
-                  mediaType: VIDEO
-                  publishedAt: '2026-10-07T12:00:00Z'
-                  permalink: https://www.instagram.com/reel/EXAMPLE1/
-                  previewImageUrl: null
-                - id: '12345678901234568'
-                  mediaType: IMAGE
-                  publishedAt: '2026-10-06T12:00:00Z'
-                  permalink: https://www.instagram.com/p/EXAMPLE2/
-                  previewImageUrl: null
-                - id: '12345678901234569'
-                  mediaType: CAROUSEL_ALBUM
-                  publishedAt: '2026-10-05T12:00:00Z'
-                  permalink: https://www.instagram.com/p/EXAMPLE3/
-                  previewImageUrl: null
+                  - id: '12345678901234567'
+                    mediaType: VIDEO
+                    publishedAt: '2026-10-07T12:00:00Z'
+                    permalink: https://www.instagram.com/reel/EXAMPLE1/
+                    previewImageUrl: null
+                  - id: '12345678901234568'
+                    mediaType: IMAGE
+                    publishedAt: '2026-10-06T12:00:00Z'
+                    permalink: https://www.instagram.com/p/EXAMPLE2/
+                    previewImageUrl: null
+                  - id: '12345678901234569'
+                    mediaType: CAROUSEL_ALBUM
+                    publishedAt: '2026-10-05T12:00:00Z'
+                    permalink: https://www.instagram.com/p/EXAMPLE3/
+                    previewImageUrl: null
                 meta:
                   athleteId: kim-angel
                   updatedAt: null
@@ -148,7 +138,7 @@ paths:
     get:
       operationId: listAthleteYouTubeVideos
       tags:
-      - YouTubeVideo
+        - YouTubeVideo
       summary: Get the latest 6 YouTube videos
       description: Return exactly 6 distinct eligible videos ordered by publishedAt descending, then id
         ascending. Only public and embeddable videos according to the last synchronization; exclude future
@@ -158,7 +148,7 @@ paths:
         If fewer than 6 eligible videos are available, retain the previous complete selection as stale
         or return 503 when no complete selection exists. Never return a partial or empty 200 response.
       parameters:
-      - $ref: '#/components/parameters/AthleteId'
+        - $ref: '#/components/parameters/AthleteId'
       responses:
         '200':
           description: Exactly 6 distinct items in the complete selection. Preview images may be null;
@@ -169,42 +159,42 @@ paths:
                 $ref: '#/components/schemas/YouTubeVideoCollection'
               example:
                 data:
-                - id: AbCdEfGhI00
-                  title: Example video 1
-                  publishedAt: '2026-10-07T12:00:00Z'
-                  watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI00
-                  embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI00
-                  thumbnailUrl: null
-                - id: AbCdEfGhI01
-                  title: Example video 2
-                  publishedAt: '2026-10-06T12:00:00Z'
-                  watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI01
-                  embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI01
-                  thumbnailUrl: null
-                - id: AbCdEfGhI02
-                  title: Example video 3
-                  publishedAt: '2026-10-05T12:00:00Z'
-                  watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI02
-                  embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI02
-                  thumbnailUrl: null
-                - id: AbCdEfGhI03
-                  title: Example video 4
-                  publishedAt: '2026-10-04T12:00:00Z'
-                  watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI03
-                  embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI03
-                  thumbnailUrl: null
-                - id: AbCdEfGhI04
-                  title: Example video 5
-                  publishedAt: '2026-10-03T12:00:00Z'
-                  watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI04
-                  embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI04
-                  thumbnailUrl: null
-                - id: AbCdEfGhI05
-                  title: Example video 6
-                  publishedAt: '2026-10-02T12:00:00Z'
-                  watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI05
-                  embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI05
-                  thumbnailUrl: null
+                  - id: AbCdEfGhI00
+                    title: Example video 1
+                    publishedAt: '2026-10-07T12:00:00Z'
+                    watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI00
+                    embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI00
+                    thumbnailUrl: null
+                  - id: AbCdEfGhI01
+                    title: Example video 2
+                    publishedAt: '2026-10-06T12:00:00Z'
+                    watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI01
+                    embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI01
+                    thumbnailUrl: null
+                  - id: AbCdEfGhI02
+                    title: Example video 3
+                    publishedAt: '2026-10-05T12:00:00Z'
+                    watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI02
+                    embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI02
+                    thumbnailUrl: null
+                  - id: AbCdEfGhI03
+                    title: Example video 4
+                    publishedAt: '2026-10-04T12:00:00Z'
+                    watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI03
+                    embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI03
+                    thumbnailUrl: null
+                  - id: AbCdEfGhI04
+                    title: Example video 5
+                    publishedAt: '2026-10-03T12:00:00Z'
+                    watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI04
+                    embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI04
+                    thumbnailUrl: null
+                  - id: AbCdEfGhI05
+                    title: Example video 6
+                    publishedAt: '2026-10-02T12:00:00Z'
+                    watchUrl: https://www.youtube.com/watch?v=AbCdEfGhI05
+                    embedUrl: https://www.youtube-nocookie.com/embed/AbCdEfGhI05
+                    thumbnailUrl: null
                 meta:
                   athleteId: kim-angel
                   updatedAt: null
@@ -221,21 +211,21 @@ paths:
     get:
       operationId: listAthleteSponsors
       tags:
-      - Sponsor
+        - Sponsor
       summary: List athlete sponsors
       description: Include active editorial sponsorship relationships only. Sort by displayOrder ascending,
         then id ascending. Discount codes belong to the athlete relationship and are null when absent;
         do not invent benefits or discount percentages.
       parameters:
-      - $ref: '#/components/parameters/AthleteId'
-      - name: limit
-        in: query
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 50
-      - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/AthleteId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - $ref: '#/components/parameters/Offset'
       responses:
         '200':
           description: Available collection; data may be empty. Fictional example, not evidence of actual
@@ -246,12 +236,12 @@ paths:
                 $ref: '#/components/schemas/SponsorCollection'
               example:
                 data:
-                - id: sponsor-example
-                  name: Example sponsor
-                  websiteUrl: https://example.com/
-                  logoUrl: https://example.com/logo.png
-                  discountCode: null
-                  displayOrder: 0
+                  - id: sponsor-example
+                    name: Example sponsor
+                    websiteUrl: https://example.com/
+                    logoUrl: https://example.com/logo.png
+                    discountCode: null
+                    displayOrder: 0
                 pagination:
                   limit: 50
                   offset: 0
@@ -357,16 +347,16 @@ components:
     ParticipationStatus:
       type: string
       enum:
-      - pending
-      - confirmed
-      - absent
+        - pending
+        - confirmed
+        - absent
       description: 'pending: no editorial decision; confirmed: participating; absent: not participating.
         Do not infer absent from incomplete external lists.'
     Participation:
       type: object
       additionalProperties: false
       required:
-      - status
+        - status
       properties:
         status:
           $ref: '#/components/schemas/ParticipationStatus'
@@ -374,17 +364,17 @@ components:
       type: object
       additionalProperties: false
       required:
-      - id
-      - name
-      - startDate
-      - endDate
-      - city
-      - country
-      - description
-      - sourceUrl
-      - sourceId
-      - logoUrl
-      - participation
+        - id
+        - name
+        - startDate
+        - endDate
+        - city
+        - country
+        - description
+        - sourceUrl
+        - sourceId
+        - logoUrl
+        - participation
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -402,9 +392,11 @@ components:
         city:
           type: string
           minLength: 1
+          nullable: true
         country:
           type: string
           minLength: 1
+          nullable: true
         description:
           type: string
           description: Plain text, without HTML.
@@ -422,17 +414,18 @@ components:
           pattern: ^https://
           description: Editorial logo, not an imported poster used by default. null means the frontend
             should use its generic fallback.
+          nullable: true
         participation:
           $ref: '#/components/schemas/Participation'
     InstagramPost:
       type: object
       additionalProperties: false
       required:
-      - id
-      - mediaType
-      - publishedAt
-      - permalink
-      - previewImageUrl
+        - id
+        - mediaType
+        - publishedAt
+        - permalink
+        - previewImageUrl
       properties:
         id:
           type: string
@@ -442,9 +435,9 @@ components:
         mediaType:
           type: string
           enum:
-          - IMAGE
-          - VIDEO
-          - CAROUSEL_ALBUM
+            - IMAGE
+            - VIDEO
+            - CAROUSEL_ALBUM
         publishedAt:
           type: string
           format: date-time
@@ -458,16 +451,17 @@ components:
           pattern: ^https://
           description: 'Available preview: video thumbnail or image/carousel cover. May expire; null when
             no valid URL is available. Does not provide all carousel items or video playback.'
+          nullable: true
     YouTubeVideo:
       type: object
       additionalProperties: false
       required:
-      - id
-      - title
-      - publishedAt
-      - watchUrl
-      - embedUrl
-      - thumbnailUrl
+        - id
+        - title
+        - publishedAt
+        - watchUrl
+        - embedUrl
+        - thumbnailUrl
       properties:
         id:
           type: string
@@ -490,16 +484,17 @@ components:
           type: string
           format: uri
           pattern: ^https://
+          nullable: true
     Sponsor:
       type: object
       additionalProperties: false
       required:
-      - id
-      - name
-      - websiteUrl
-      - logoUrl
-      - discountCode
-      - displayOrder
+        - id
+        - name
+        - websiteUrl
+        - logoUrl
+        - discountCode
+        - displayOrder
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -514,10 +509,12 @@ components:
           type: string
           format: uri
           pattern: ^https://
+          nullable: true
         discountCode:
           type: string
           minLength: 1
           description: Editorial athlete discount code; null when absent. Does not imply a discount percentage.
+          nullable: true
         displayOrder:
           type: integer
           minimum: 0
@@ -525,10 +522,10 @@ components:
       type: object
       additionalProperties: false
       required:
-      - limit
-      - offset
-      - total
-      - hasMore
+        - limit
+        - offset
+        - total
+        - hasMore
       properties:
         limit:
           type: integer
@@ -548,9 +545,9 @@ components:
       type: object
       additionalProperties: false
       required:
-      - athleteId
-      - updatedAt
-      - availability
+        - athleteId
+        - updatedAt
+        - availability
       properties:
         athleteId:
           $ref: '#/components/schemas/Id'
@@ -560,12 +557,13 @@ components:
           description: Last known update of the served selection or collection, including editorial decisions.
             null for legacy data with unknown acquisition time. A failed refresh does not advance this
             timestamp.
+          nullable: true
         availability:
           type: string
           enum:
-          - available
-          - stale
-          - unknown
+            - available
+            - stale
+            - unknown
           description: 'available: last update succeeded within the service freshness threshold; stale:
             excessive age, failed refresh or incomplete social selection; unknown: age is unknown. Thresholds
             must be documented backend configuration. This value does not relax the exact social item
@@ -574,10 +572,10 @@ components:
       type: object
       additionalProperties: false
       required:
-      - type
-      - title
-      - status
-      - detail
+        - type
+        - title
+        - status
+        - detail
       properties:
         type:
           type: string
@@ -597,25 +595,23 @@ components:
       type: object
       additionalProperties: false
       required:
-      - data
-      - pagination
-      - meta
+        - data
+        - meta
       properties:
         data:
           type: array
-          maxItems: 100
           items:
             $ref: '#/components/schemas/Competition'
-        pagination:
-          $ref: '#/components/schemas/Pagination'
+          description: All competitions matching the fixed annual window and optional participation filter.
+            No item-count cap or pagination.
         meta:
           $ref: '#/components/schemas/Metadata'
     InstagramPostCollection:
       type: object
       additionalProperties: false
       required:
-      - data
-      - meta
+        - data
+        - meta
       properties:
         data:
           type: array
@@ -632,8 +628,8 @@ components:
       type: object
       additionalProperties: false
       required:
-      - data
-      - meta
+        - data
+        - meta
       properties:
         data:
           type: array
@@ -650,9 +646,9 @@ components:
       type: object
       additionalProperties: false
       required:
-      - data
-      - pagination
-      - meta
+        - data
+        - pagination
+        - meta
       properties:
         data:
           type: array
