@@ -1,0 +1,268 @@
+openapi: 3.0.3
+info:
+  title: YouTube Data API v3 — Consumer Contract
+  version: 1.0.0
+  description: Unofficial consumer contract for the subset of the YouTube Data API v3 used to select
+    the latest videos of an athlete channel. It covers only the requests and response fields read by
+    this project, not the complete provider API. Every response property is optional, as in the provider
+    discovery document; the importer validates what it needs and discards the rest. Unknown provider
+    properties are ignored. Values that the provider documents as enumerations (privacyStatus,
+    liveBroadcastContent) are modelled as plain strings so that a new provider value does not break
+    deserialization. Error payloads follow the Google API error format and are not modelled. Examples
+    are fictional.
+servers:
+  - url: https://www.googleapis.com/youtube/v3
+security:
+  - ApiKeyHeader: [ ]
+tags:
+  - name: YouTubeData
+    description: Channels, playlist items and videos of the YouTube Data API v3
+paths:
+  /channels:
+    get:
+      operationId: listChannels
+      tags:
+        - YouTubeData
+      summary: Get the uploads playlist of a channel
+      description: The importer sends part=contentDetails and a single channel id, and reads
+        items[0].contentDetails.relatedPlaylists.uploads. An unknown channel returns 200 without items.
+      parameters:
+        - name: part
+          in: query
+          required: true
+          schema:
+            type: string
+          example: contentDetails
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+          example: UCEqAjtwYKSwKDN4BENhvc6A
+      responses:
+        '200':
+          description: Matching channels; empty or without items when the channel does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelListResponse'
+              example:
+                items:
+                  - id: UCEqAjtwYKSwKDN4BENhvc6A
+                    contentDetails:
+                      relatedPlaylists:
+                        uploads: UUEqAjtwYKSwKDN4BENhvc6A
+        default:
+          description: Provider error in the Google API error format, not modelled. The importer retries
+            429, 500, 502, 503 and 504 and fails on any other status.
+  /playlistItems:
+    get:
+      operationId: listPlaylistItems
+      tags:
+        - YouTubeData
+      summary: Get one page of video ids of a playlist
+      description: The importer sends part=contentDetails, the uploads playlist id, maxResults=50 and,
+        from the second page on, the nextPageToken of the previous page. Page tokens are opaque.
+      parameters:
+        - name: part
+          in: query
+          required: true
+          schema:
+            type: string
+          example: contentDetails
+        - name: playlistId
+          in: query
+          required: true
+          schema:
+            type: string
+          example: UUEqAjtwYKSwKDN4BENhvc6A
+        - name: maxResults
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 50
+          example: 50
+        - name: pageToken
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Omitted for the first page.
+      responses:
+        '200':
+          description: One page of playlist items. nextPageToken is absent on the last page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaylistItemListResponse'
+              example:
+                nextPageToken: CDIQAA
+                items:
+                  - contentDetails:
+                      videoId: AbCdEfGhI00
+        default:
+          description: Provider error in the Google API error format, not modelled. The importer retries
+            429, 500, 502, 503 and 504 and fails on any other status.
+  /videos:
+    get:
+      operationId: listVideos
+      tags:
+        - YouTubeData
+      summary: Get the details of up to 50 videos
+      description: The importer sends part=snippet,status and a comma-separated list of the distinct
+        video ids of one playlist page. Videos that no longer exist are simply absent from items.
+      parameters:
+        - name: part
+          in: query
+          required: true
+          schema:
+            type: string
+          example: snippet,status
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Comma-separated video ids, at most 50.
+          example: AbCdEfGhI00,AbCdEfGhI01
+      responses:
+        '200':
+          description: Details of the existing videos among the requested ids.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoListResponse'
+              example:
+                items:
+                  - id: AbCdEfGhI00
+                    snippet:
+                      channelId: UCEqAjtwYKSwKDN4BENhvc6A
+                      title: Example video
+                      publishedAt: '2026-10-07T12:00:00Z'
+                      liveBroadcastContent: none
+                      thumbnails:
+                        high:
+                          url: https://i.ytimg.com/vi/AbCdEfGhI00/hqdefault.jpg
+                    status:
+                      privacyStatus: public
+                      embeddable: true
+        default:
+          description: Provider error in the Google API error format, not modelled. The importer retries
+            429, 500, 502, 503 and 504 and fails on any other status.
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-goog-api-key
+      description: Server-side API key. Sent as a header instead of the documented key query parameter so
+        that it never becomes part of a URL, and therefore never appears in exception messages or logs.
+  schemas:
+    ChannelListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Channel'
+    Channel:
+      type: object
+      properties:
+        id:
+          type: string
+        contentDetails:
+          $ref: '#/components/schemas/ChannelContentDetails'
+    ChannelContentDetails:
+      type: object
+      properties:
+        relatedPlaylists:
+          $ref: '#/components/schemas/RelatedPlaylists'
+    RelatedPlaylists:
+      type: object
+      properties:
+        uploads:
+          type: string
+          description: Playlist with every video uploaded by the channel.
+    PlaylistItemListResponse:
+      type: object
+      properties:
+        nextPageToken:
+          type: string
+          description: Opaque token of the next page; absent on the last page.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaylistItem'
+    PlaylistItem:
+      type: object
+      properties:
+        contentDetails:
+          $ref: '#/components/schemas/PlaylistItemContentDetails'
+    PlaylistItemContentDetails:
+      type: object
+      properties:
+        videoId:
+          type: string
+    VideoListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Video'
+    Video:
+      type: object
+      properties:
+        id:
+          type: string
+        snippet:
+          $ref: '#/components/schemas/VideoSnippet'
+        status:
+          $ref: '#/components/schemas/VideoStatus'
+    VideoSnippet:
+      type: object
+      properties:
+        channelId:
+          type: string
+        title:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+          description: Publication time; may be in the future for scheduled premieres.
+        liveBroadcastContent:
+          type: string
+          description: Documented values are none, live and upcoming. The importer excludes live and
+            upcoming.
+        thumbnails:
+          $ref: '#/components/schemas/ThumbnailDetails'
+    ThumbnailDetails:
+      type: object
+      description: Each size is optional; maxres and standard are often missing.
+      properties:
+        default:
+          $ref: '#/components/schemas/Thumbnail'
+        medium:
+          $ref: '#/components/schemas/Thumbnail'
+        high:
+          $ref: '#/components/schemas/Thumbnail'
+        standard:
+          $ref: '#/components/schemas/Thumbnail'
+        maxres:
+          $ref: '#/components/schemas/Thumbnail'
+    Thumbnail:
+      type: object
+      properties:
+        url:
+          type: string
+    VideoStatus:
+      type: object
+      properties:
+        privacyStatus:
+          type: string
+          description: Documented values are public, unlisted and private. Only public is accepted.
+        embeddable:
+          type: boolean
+          description: Whether the video can be played in an embedded player (iframe).

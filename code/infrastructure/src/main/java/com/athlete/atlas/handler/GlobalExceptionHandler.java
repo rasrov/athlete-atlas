@@ -1,5 +1,6 @@
 package com.athlete.atlas.handler;
 
+import com.athlete.atlas.exception.DataUnavailableException;
 import com.athlete.atlas.exception.NotFoundException;
 import com.athlete.atlas.exception.RemoteException;
 import com.athlete.atlas.exception.rest.BadRequestException;
@@ -121,6 +122,16 @@ public class GlobalExceptionHandler {
         HttpStatus.SERVICE_UNAVAILABLE,
         "Data temporarily unavailable",
         RestClientErrorCode.REMOTE_API_ERROR.message());
+  }
+
+  /** Data that has not been synchronized yet: nothing to serve until the first refresh succeeds. */
+  @ExceptionHandler(DataUnavailableException.class)
+  public ResponseEntity<Problem> handleDataUnavailable(final DataUnavailableException ex) {
+    log.debug("Data unavailable: {}", ex.getMessage());
+    return problem(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "Data temporarily unavailable",
+        "The requested data has not been synchronized yet.");
   }
 
   /**

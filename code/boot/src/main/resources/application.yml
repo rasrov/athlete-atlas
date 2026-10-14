@@ -15,10 +15,43 @@ rest-clients:
     user-agent: KimAngelWebsite/1.0
     page-size: 50
     max-pages: 200
+  youtube:
+    base-url: https://www.googleapis.com/youtube/v3
+    # Server-side only. Sent in the X-goog-api-key header, never in URLs or logs. Empty: refreshes fail
+    # and the endpoint answers 503 until a key is configured.
+    api-key: ${YOUTUBE_API_KEY:}
+    connect-timeout: 5s
+    read-timeout: 30s
+    page-size: 50
+    max-pages: 4
+    selection-size: 6
+
+youtube:
+  # TODO: move the athlete -> YouTube channel association to storage once the backend has a database.
+  channels:
+    kim-angel: UCEqAjtwYKSwKDN4BENhvc6A
+  # Replaces the GitHub Actions workflow of the current website, which runs every six hours.
+  refresh-initial-delay: 0s
+  refresh-interval: 6h
+  # A selection older than this is reported as stale even if its last refresh succeeded.
+  freshness-threshold: 12h
 
 resilience4j:
   retry:
     instances:
+      # Applied per request in YouTubeDataClient: 3 attempts waiting 1s and 2s, as the former script.
+      youTubeDataApi:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
+          - org.springframework.web.client.HttpServerErrorException$InternalServerError
+          - org.springframework.web.client.HttpServerErrorException$BadGateway
+          - org.springframework.web.client.HttpServerErrorException$ServiceUnavailable
+          - org.springframework.web.client.HttpServerErrorException$GatewayTimeout
+          - org.springframework.web.client.ResourceAccessException
       # Applied per page in IfbbEventsClient. Only transient failures are retried, as the IFBB
       # contract states: 429, 5xx and network errors. Other 4xx fail immediately.
       ifbbEventsApi:

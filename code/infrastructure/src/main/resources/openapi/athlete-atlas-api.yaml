@@ -140,19 +140,23 @@ paths:
       tags:
         - YouTubeVideo
       summary: Get the latest 6 YouTube videos
-      description: Return exactly 6 distinct eligible videos ordered by publishedAt descending, then id
+      description: Return up to 6 distinct eligible videos ordered by publishedAt descending, then id
         ascending. Only public and embeddable videos according to the last synchronization; exclude future
         publications, upcoming streams and live broadcasts. Include Shorts without inferring their format
         from duration. No query parameters are supported; reject limit, offset or any other query parameter
         with 400. Provide watch/embed URLs, not video downloads. Availability can change after synchronization.
-        If fewer than 6 eligible videos are available, retain the previous complete selection as stale
-        or return 503 when no complete selection exists. Never return a partial or empty 200 response.
+        Videos are synchronized periodically by the backend, never on request. If the channel has fewer
+        than 6 eligible videos, return those found; fewer than 6 (even 0) is a valid 200 response, not
+        an error. The latest successful synchronization always replaces the previous one. On a failed
+        synchronization, the previous selection is kept and meta.availability is stale. Return 503 only
+        when no successful synchronization exists yet.
       parameters:
         - $ref: '#/components/parameters/AthleteId'
       responses:
         '200':
-          description: Exactly 6 distinct items in the complete selection. Preview images may be null;
-            missing previews do not reduce the item count. Fictional examples.
+          description: Up to 6 distinct items of the latest successful synchronization; fewer when the
+            channel has fewer eligible videos. Preview images may be null; missing previews do not reduce
+            the item count. Fictional examples.
           content:
             application/json:
               schema:
@@ -636,10 +640,9 @@ components:
           maxItems: 6
           items:
             $ref: '#/components/schemas/YouTubeVideo'
-          minItems: 6
           uniqueItems: true
-          description: Exactly 6 items with distinct IDs. Duplicate IDs are invalid even if other fields
-            differ.
+          description: Up to 6 items with distinct IDs; fewer (even none) when the channel has fewer
+            eligible videos. Duplicate IDs are invalid even if other fields differ.
         meta:
           $ref: '#/components/schemas/Metadata'
     SponsorCollection:
