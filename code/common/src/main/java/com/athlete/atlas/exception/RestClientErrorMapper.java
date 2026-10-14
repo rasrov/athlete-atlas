@@ -1,6 +1,7 @@
 package com.athlete.atlas.exception;
 
 import java.net.SocketTimeoutException;
+import java.net.http.HttpTimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -22,11 +23,10 @@ public class RestClientErrorMapper {
   public static RemoteException mapRemoteException(
       final RuntimeException e, final String boundedContextCode) {
     if (e instanceof final HttpStatusCodeException statusEx) {
-      log.warn(
-          "[{}] Upstream responded {}: {}",
-          boundedContextCode,
-          statusEx.getStatusCode().value(),
-          statusEx.getResponseBodyAsString());
+      // The response body is never logged: provider error payloads may echo request data or
+      // carry details that must not reach the logs. Adapters that need a diagnosis extract the
+      // safe fields of their provider's error format themselves.
+      log.warn("[{}] Upstream responded {}", boundedContextCode, statusEx.getStatusCode().value());
       return new RemoteException(
           String.format("[%s] upstream error", boundedContextCode),
           statusEx.getStatusCode().value(),
@@ -35,7 +35,7 @@ public class RestClientErrorMapper {
 
     if (e instanceof final ResourceAccessException accessEx) {
       // Network failures: connection refused or connection/read timeouts (no HTTP response).
-      final boolean isTimeout = accessEx.getCause() instanceof SocketTimeoutException;
+      final boolean isTimeout = isTimeout(accessEx);
       final int statusCode =
           isTimeout ? HttpStatus.GATEWAY_TIMEOUT.value() : HttpStatus.SERVICE_UNAVAILABLE.value();
       log.warn(
@@ -69,5 +69,18 @@ public class RestClientErrorMapper {
         boundedContextCode,
         e.getStatusCode());
     throw e;
+  }
+
+  /**
+   * Timeouts surface differently depending on the HTTP client: SocketTimeoutException (JDK
+   * HttpURLConnection, Apache) or HttpTimeoutException (JDK HttpClient, the default one).
+   */
+  private static boolean isTimeout(final ResourceAccessException e) {
+    for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+      if (cause instanceof SocketTimeoutException || cause instanceof HttpTimeoutException) {
+        return true;
+      }
+    }
+    return false;
   }
 }

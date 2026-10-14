@@ -88,19 +88,22 @@ paths:
       tags:
         - InstagramPost
       summary: Get the latest 3 Instagram posts
-      description: Return exactly 3 distinct eligible posts from the latest complete synchronized selection,
-        ordered by publishedAt descending, then id ascending. No query parameters are supported; reject
-        limit, offset or any other query parameter with 400. A post may be an image, carousel or video
-        with one optional preview image. Do not serve media binaries or promise permanent CDN URLs. Preserve
-        the permalink when the preview is unavailable. If fewer than 3 eligible posts are available, retain
-        the previous complete selection as stale or return 503 when no complete selection exists. Never
-        return a partial or empty 200 response.
+      description: Return up to 3 distinct eligible posts from the latest successful synchronization,
+        ordered by publishedAt descending, then numeric id ascending. No query parameters are supported;
+        reject limit, offset or any other query parameter with 400. A post may be an image, carousel or
+        video with one optional preview image. Do not serve media binaries or promise permanent CDN URLs.
+        Preserve the permalink when the preview is unavailable. Posts are synchronized periodically by
+        the backend, never on request. If the profile has fewer than 3 eligible posts, return those found;
+        fewer than 3 (even 0) is a valid 200 response, not an error. The latest successful synchronization
+        always replaces the previous one. On a failed synchronization, the previous selection is kept
+        and meta.availability is stale. Return 503 only when no successful synchronization exists yet.
       parameters:
         - $ref: '#/components/parameters/AthleteId'
       responses:
         '200':
-          description: Exactly 3 distinct items in the complete selection. Preview images may be null;
-            missing previews do not reduce the item count. Fictional examples.
+          description: Up to 3 distinct items of the latest successful synchronization; fewer when the
+            profile has fewer eligible posts. Preview images may be null; missing previews do not reduce
+            the item count. Fictional examples.
           content:
             application/json:
               schema:
@@ -622,10 +625,9 @@ components:
           maxItems: 3
           items:
             $ref: '#/components/schemas/InstagramPost'
-          minItems: 3
           uniqueItems: true
-          description: Exactly 3 items with distinct IDs. Duplicate IDs are invalid even if other fields
-            differ.
+          description: Up to 3 items with distinct IDs; fewer (even none) when the profile has fewer
+            eligible posts. Duplicate IDs are invalid even if other fields differ.
         meta:
           $ref: '#/components/schemas/Metadata'
     YouTubeVideoCollection:

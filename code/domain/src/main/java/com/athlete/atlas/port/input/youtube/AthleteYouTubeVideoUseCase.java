@@ -1,6 +1,7 @@
 package com.athlete.atlas.port.input.youtube;
 
-import com.athlete.atlas.model.youtube.AthleteYouTubeVideos;
+import com.athlete.atlas.model.selection.AthleteSelection;
+import com.athlete.atlas.model.youtube.YouTubeVideo;
 import jakarta.annotation.Nonnull;
 
 public interface AthleteYouTubeVideoUseCase {
@@ -11,5 +12,5 @@ public interface AthleteYouTubeVideoUseCase {
    * @throws com.athlete.atlas.exception.NotFoundException if the athlete has no channel.
    * @throws com.athlete.atlas.exception.DataUnavailableException if no refresh has succeeded yet.
    */
-  AthleteYouTubeVideos listAthleteYouTubeVideos(@Nonnull String athleteId);
+  AthleteSelection<YouTubeVideo> listAthleteYouTubeVideos(@Nonnull String athleteId);
 }

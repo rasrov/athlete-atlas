@@ -16,7 +16,7 @@ import com.athlete.atlas.exception.NotFoundException;
 import com.athlete.atlas.handler.GlobalExceptionHandler;
 import com.athlete.atlas.input.rest.mapper.AthleteYouTubeVideoMapperImpl;
 import com.athlete.atlas.model.enums.Availability;
-import com.athlete.atlas.model.youtube.AthleteYouTubeVideos;
+import com.athlete.atlas.model.selection.AthleteSelection;
 import com.athlete.atlas.model.youtube.YouTubeVideo;
 import com.athlete.atlas.port.input.youtube.AthleteYouTubeVideoUseCase;
 import java.net.URI;
@@ -140,7 +140,7 @@ class YouTubeVideoControllerTest {
     verify(athleteYouTubeVideoUseCase, never()).listAthleteYouTubeVideos(anyString());
   }
 
-  private static AthleteYouTubeVideos selection(final int count, final Availability availability) {
+  private static AthleteSelection<YouTubeVideo> selection(final int count, final Availability availability) {
     final List<YouTubeVideo> videos =
         IntStream.rangeClosed(1, count)
             .mapToObj(
@@ -155,6 +155,6 @@ class YouTubeVideoControllerTest {
                       null);
                 })
             .toList();
-    return new AthleteYouTubeVideos(ATHLETE_ID, videos, UPDATED_AT, availability);
+    return new AthleteSelection<>(ATHLETE_ID, videos, UPDATED_AT, availability);
   }
 }

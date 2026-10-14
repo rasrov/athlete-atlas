@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.athlete.atlas.infrastructure.api.model.Metadata;
 import com.athlete.atlas.model.enums.Availability;
-import com.athlete.atlas.model.youtube.AthleteYouTubeVideos;
+import com.athlete.atlas.model.selection.AthleteSelection;
 import com.athlete.atlas.model.youtube.YouTubeVideo;
 import java.net.URI;
 import java.time.Instant;
@@ -46,7 +46,7 @@ class AthleteYouTubeVideoMapperTest {
   @ParameterizedTest
   @EnumSource(Availability.class)
   void mapsEveryAvailability(final Availability availability) {
-    assertThat(mapper.toDto(availability).name()).isEqualTo(availability.name());
+    assertThat(SelectionMetadataMapper.toDto(availability).name()).isEqualTo(availability.name());
   }
 
   @Test
@@ -56,7 +56,7 @@ class AthleteYouTubeVideoMapperTest {
 
     final var collection =
         mapper.toDtoCollection(
-            new AthleteYouTubeVideos(
+            new AthleteSelection<>(
                 "kim-angel", List.of(latest, older), UPDATED_AT, Availability.STALE));
 
     assertThat(collection.getData())
@@ -74,7 +74,7 @@ class AthleteYouTubeVideoMapperTest {
   void anEmptySelectionIsAnEmptyCollection() {
     final var collection =
         mapper.toDtoCollection(
-            new AthleteYouTubeVideos("kim-angel", List.of(), UPDATED_AT, Availability.AVAILABLE));
+            new AthleteSelection<>("kim-angel", List.of(), UPDATED_AT, Availability.AVAILABLE));
 
     assertThat(collection.getData()).isEmpty();
   }

@@ -20,9 +20,8 @@ public class YouTubeVideoController implements YouTubeVideoApi {
   @Override
   public ResponseEntity<YouTubeVideoCollection> listAthleteYouTubeVideos(
       @Nonnull final String athleteId) {
-    final var athleteYouTubeVideos =
-        athleteYouTubeVideoUseCase.listAthleteYouTubeVideos(athleteId);
+    final var selection = athleteYouTubeVideoUseCase.listAthleteYouTubeVideos(athleteId);
 
-    return ResponseEntity.ok(athleteYouTubeVideoMapper.toDtoCollection(athleteYouTubeVideos));
+    return ResponseEntity.ok(athleteYouTubeVideoMapper.toDtoCollection(selection));
   }
 }

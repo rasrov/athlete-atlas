@@ -1,0 +1,153 @@
+openapi: 3.0.3
+info:
+  title: Facebook Graph API (Instagram Business Discovery) — Consumer Contract
+  version: 1.0.0
+  description: Unofficial consumer contract for the Business Discovery request used to read the latest
+    media of an athlete Instagram profile through an authorized Instagram business account. It covers
+    only the request and the response fields read by this project, not the complete provider API.
+    Every response property is optional and additional provider properties are allowed; the importer
+    validates what it needs and discards the rest. media_type and timestamp are modelled as plain
+    strings so that a new media type or an offset without colon (+0000, the provider format) does not
+    break deserialization. Media URLs are signed and temporary. Examples are fictional.
+servers:
+  - url: https://graph.facebook.com
+security:
+  - BearerAuth: [ ]
+tags:
+  - name: InstagramGraph
+    description: Instagram Business Discovery through the Facebook Graph API
+paths:
+  /{apiVersion}/{accountId}:
+    get:
+      operationId: getBusinessDiscovery
+      tags:
+        - InstagramGraph
+      summary: Get the latest media of an Instagram profile
+      description: 'Single request, without pagination: the importer asks for up to media-limit items
+        (50) with fields=business_discovery.username({username}){username,media.limit({limit}){id,permalink,media_type,media_url,thumbnail_url,timestamp}}.
+        The username comes from the validated athlete configuration, never from a public request.'
+      parameters:
+        - name: apiVersion
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^v[0-9]+\.[0-9]+$
+          example: v26.0
+        - name: accountId
+          in: path
+          required: true
+          description: Instagram business account authorized to run the Business Discovery query.
+          schema:
+            type: string
+            pattern: ^[0-9]+$
+          example: '17841401870042081'
+        - name: fields
+          in: query
+          required: true
+          schema:
+            type: string
+          example: business_discovery.username(kim_angel){username,media.limit(50){id,permalink,media_type,media_url,thumbnail_url,timestamp}}
+      responses:
+        '200':
+          description: Business Discovery result of the requested profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessDiscoveryResponse'
+              example:
+                business_discovery:
+                  username: kim_angel
+                  media:
+                    data:
+                      - id: '12345678901234567'
+                        permalink: https://www.instagram.com/p/EXAMPLE/
+                        media_type: IMAGE
+                        media_url: https://example.cdninstagram.com/preview.jpg
+                        timestamp: '2026-10-01T12:00:00+0000'
+                id: '17841401870042081'
+        default:
+          description: Provider error. The importer retries 429, 500, 502, 503 and 504 and fails on any
+            other status. Only code, type and error_subcode are used for diagnosis; the message and the
+            rest of the payload are never logged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphErrorResponse'
+              example:
+                error:
+                  message: Error validating access token
+                  type: OAuthException
+                  code: 190
+                  error_subcode: 463
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Server-side access token (INSTAGRAM_ACCESS_TOKEN). It expires and must be renewed
+        outside this integration.
+  schemas:
+    BusinessDiscoveryResponse:
+      type: object
+      properties:
+        business_discovery:
+          $ref: '#/components/schemas/BusinessDiscovery'
+        id:
+          type: string
+        error:
+          $ref: '#/components/schemas/GraphError'
+    BusinessDiscovery:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Must match the requested profile.
+        media:
+          $ref: '#/components/schemas/MediaPage'
+    MediaPage:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Media'
+    Media:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Numeric id represented as a string.
+        permalink:
+          type: string
+          description: Expected as https://www.instagram.com/p/{code}/ or https://www.instagram.com/reel/{code}/.
+        media_type:
+          type: string
+          description: Documented values are IMAGE, VIDEO and CAROUSEL_ALBUM; other values are discarded.
+        media_url:
+          type: string
+          description: Optional signed and temporary URL; cover of images and carousels.
+        thumbnail_url:
+          type: string
+          description: Optional signed and temporary URL; cover of videos.
+        timestamp:
+          type: string
+          description: Publication time with offset, e.g. 2026-10-01T12:00:00+0000.
+    GraphErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/GraphError'
+    GraphError:
+      type: object
+      properties:
+        message:
+          type: string
+        type:
+          type: string
+        code:
+          type: integer
+        error_subcode:
+          type: integer
+        fbtrace_id:
+          type: string

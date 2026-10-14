@@ -12,7 +12,7 @@ import com.athlete.atlas.exception.NotFoundException;
 import com.athlete.atlas.exception.RemoteException;
 import com.athlete.atlas.model.enums.Availability;
 import com.athlete.atlas.model.youtube.YouTubeVideo;
-import com.athlete.atlas.model.youtube.YouTubeVideoSelection;
+import com.athlete.atlas.model.selection.SynchronizedSelection;
 import com.athlete.atlas.port.output.YouTubePort;
 import com.athlete.atlas.port.output.YouTubeVideoSelectionRepository;
 import java.net.URI;
@@ -75,7 +75,7 @@ class AthleteYouTubeVideoServiceTest {
 
     final var result = service.listAthleteYouTubeVideos(ATHLETE);
     assertThat(result.athleteId()).isEqualTo(ATHLETE);
-    assertThat(result.videos()).isEqualTo(videos(6));
+    assertThat(result.items()).isEqualTo(videos(6));
     assertThat(result.updatedAt()).isEqualTo(T0);
     assertThat(result.availability()).isEqualTo(Availability.AVAILABLE);
   }
@@ -87,7 +87,7 @@ class AthleteYouTubeVideoServiceTest {
     service.refreshAll();
 
     final var result = service.listAthleteYouTubeVideos(ATHLETE);
-    assertThat(result.videos()).hasSize(2);
+    assertThat(result.items()).hasSize(2);
     assertThat(result.availability()).isEqualTo(Availability.AVAILABLE);
   }
 
@@ -97,7 +97,7 @@ class AthleteYouTubeVideoServiceTest {
 
     service.refreshAll();
 
-    assertThat(service.listAthleteYouTubeVideos(ATHLETE).videos()).isEmpty();
+    assertThat(service.listAthleteYouTubeVideos(ATHLETE).items()).isEmpty();
   }
 
   @Test
@@ -109,7 +109,7 @@ class AthleteYouTubeVideoServiceTest {
     service.refreshAll();
 
     final var result = service.listAthleteYouTubeVideos(ATHLETE);
-    assertThat(result.videos()).isEqualTo(videos(5));
+    assertThat(result.items()).isEqualTo(videos(5));
     assertThat(result.updatedAt()).isEqualTo(T0.plus(Duration.ofHours(6)));
   }
 
@@ -124,7 +124,7 @@ class AthleteYouTubeVideoServiceTest {
     service.refreshAll();
 
     final var result = service.listAthleteYouTubeVideos(ATHLETE);
-    assertThat(result.videos()).isEqualTo(videos(6));
+    assertThat(result.items()).isEqualTo(videos(6));
     assertThat(result.updatedAt()).isEqualTo(T0);
     assertThat(result.availability()).isEqualTo(Availability.STALE);
   }
@@ -139,7 +139,7 @@ class AthleteYouTubeVideoServiceTest {
     service.refreshAll();
 
     final var result = service.listAthleteYouTubeVideos(ATHLETE);
-    assertThat(result.videos()).isEqualTo(videos(3));
+    assertThat(result.items()).isEqualTo(videos(3));
     assertThat(result.availability()).isEqualTo(Availability.STALE);
   }
 
@@ -195,7 +195,7 @@ class AthleteYouTubeVideoServiceTest {
 
     service.refreshAll();
 
-    assertThat(service.listAthleteYouTubeVideos(ATHLETE).videos()).hasSize(6);
+    assertThat(service.listAthleteYouTubeVideos(ATHLETE).items()).hasSize(6);
     assertThatThrownBy(() -> service.listAthleteYouTubeVideos("failing"))
         .isInstanceOf(DataUnavailableException.class);
   }
@@ -226,15 +226,15 @@ class AthleteYouTubeVideoServiceTest {
 
   private static final class InMemoryRepository implements YouTubeVideoSelectionRepository {
 
-    private final Map<String, YouTubeVideoSelection> selections = new HashMap<>();
+    private final Map<String, SynchronizedSelection<YouTubeVideo>> selections = new HashMap<>();
 
     @Override
-    public Optional<YouTubeVideoSelection> findByAthleteId(final String athleteId) {
+    public Optional<SynchronizedSelection<YouTubeVideo>> findByAthleteId(final String athleteId) {
       return Optional.ofNullable(selections.get(athleteId));
     }
 
     @Override
-    public void save(final String athleteId, final YouTubeVideoSelection selection) {
+    public void save(final String athleteId, final SynchronizedSelection<YouTubeVideo> selection) {
       selections.put(athleteId, selection);
     }
   }
