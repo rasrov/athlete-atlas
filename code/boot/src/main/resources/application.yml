@@ -1,3 +1,42 @@
+spring:
+  datasource:
+    # Defaults match docker-compose.yml for local development; any other environment sets them
+    # through environment variables. Credentials never go to the repository or the logs.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:athlete_atlas}?reWriteBatchedInserts=true
+    username: ${DB_USERNAME:athlete_atlas}
+    password: ${DB_PASSWORD:athlete_atlas}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      # Hikari durations are milliseconds. Fail fast (3 s) when the pool is exhausted instead of
+      # piling up waiting threads; renew connections every 30 min.
+      connection-timeout: 3000
+      max-lifetime: 1800000
+      # No query of this schema should take longer; cuts the ones that hang.
+      connection-init-sql: SET statement_timeout = '5s'
+  jpa:
+    # Releases the connection when the repository call ends, not when the HTTP response is written.
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema; Hibernate only checks that the entities match it.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.time_zone: UTC
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
+        default_batch_fetch_size: 50
+  flyway:
+    locations: classpath:db/migration
+  cache:
+    type: caffeine
+    cache-names: athletes, confirmedCompetitions, hallOfFame
+    caffeine:
+      # Entries are evicted when the data is written; the TTL only covers changes made outside the
+      # backend (e.g. SQL). recordStats exposes hits, misses and size in Prometheus.
+      spec: maximumSize=500,expireAfterWrite=10m,recordStats
+
 app:
   # Zone of the API contract for local dates (competition season, season-start-cron), whatever
   # the time zone of the server. Instants (updatedAt) are always served in UTC.
@@ -46,9 +85,7 @@ competitions:
   freshness-threshold: 12h
 
 youtube:
-  # TODO: move the athlete -> YouTube channel association to storage once the backend has a database.
-  channels:
-    kim-angel: UCEqAjtwYKSwKDN4BENhvc6A
+  # The channel of each athlete is stored in the athlete table (column youtube_channel_id).
   # Replaces the GitHub Actions workflow of the current website, which runs every six hours.
   refresh-initial-delay: 0s
   refresh-interval: 6h
@@ -56,10 +93,7 @@ youtube:
   freshness-threshold: 12h
 
 instagram:
-  # TODO: move the athlete -> Instagram username association to storage once the backend has a
-  # database. Usernames are validated on startup because they end up in the Graph API query.
-  usernames:
-    kim-angel: kim_angel
+  # The username of each athlete is stored in the athlete table (column instagram_username).
   # Replaces the GitHub Actions workflow of the current website, which runs every six hours.
   refresh-initial-delay: 0s
   refresh-interval: 6h

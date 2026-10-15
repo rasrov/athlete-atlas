@@ -23,6 +23,14 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
             <scope>runtime</scope>
@@ -37,6 +45,11 @@
         <dependency>
             <groupId>com.athlete.atlas</groupId>
             <artifactId>athlete-atlas-infrastructure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.athlete.atlas</groupId>
+            <artifactId>athlete-atlas-persistence</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

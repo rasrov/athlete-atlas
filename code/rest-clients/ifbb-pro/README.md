@@ -10,7 +10,7 @@ Resilience is applied per page in `IfbbEventsClient` (instances `ifbbEventsApi` 
 
 Invalid provider events are discarded, not rejected: missing or non-positive IDs, unparseable or reversed dates, and missing title, description or URL. Duplicate IDs keep the first valid occurrence. Discarded IDs are logged in a single warning per request. Category/division/Natural filtering is not applied.
 
-MapStruct (`IfbbEventMapper`) maps provider DTOs to the existing AthleteCompetition record. Provider date-times are parsed strictly as local dates; text tags are removed and HTML entities decoded. Participation defaults to PENDING and logoUrl to null, since editorial information is not supplied by IFBB. IDs use the provisional namespace `ifbb-<sourceId>`; this is not a persistence strategy for provider ID changes.
+MapStruct (`IfbbEventMapper`) maps provider DTOs to the existing AthleteCompetition record. Provider date-times are parsed strictly as local dates; text tags are removed and HTML entities decoded. logoUrl defaults to null, since editorial information is not supplied by IFBB; the participation of the athlete comes from the database. IDs use the provisional namespace `ifbb-<sourceId>`; this is not a persistence strategy for provider ID changes.
 
 The client is generated with the `restclient` library into `com.athlete.atlas.output.rest.ifbb.generated`. `IfbbProClientConfiguration` builds its `RestClient` with the configured timeouts and the `User-Agent` required by the contract; the generated API sends `Accept: application/json`.
 

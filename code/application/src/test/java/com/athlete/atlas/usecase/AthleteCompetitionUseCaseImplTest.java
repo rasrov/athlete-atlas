@@ -10,13 +10,17 @@ import static org.mockito.Mockito.when;
 
 import com.athlete.atlas.config.CompetitionCatalogProperties;
 import com.athlete.atlas.exception.DataUnavailableException;
+import com.athlete.atlas.exception.NotFoundException;
 import com.athlete.atlas.exception.RemoteException;
+import com.athlete.atlas.exception.StorageUnavailableException;
+import com.athlete.atlas.model.athlete.Athlete;
 import com.athlete.atlas.model.competition.AthleteCompetition;
 import com.athlete.atlas.model.competition.CompetitionCatalog;
 import com.athlete.atlas.model.competition.DateRange;
-import com.athlete.atlas.model.competition.enums.ParticipationStatus;
 import com.athlete.atlas.model.enums.Availability;
+import com.athlete.atlas.port.output.AthleteRepository;
 import com.athlete.atlas.port.output.CompetitionCatalogRepository;
+import com.athlete.atlas.port.output.CompetitionParticipationRepository;
 import com.athlete.atlas.port.output.CompetitionPort;
 import java.net.URI;
 import java.time.Clock;
@@ -25,6 +29,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,10 +48,19 @@ class AthleteCompetitionUseCaseImplTest {
 
   private InMemoryRepository repository;
 
+  private AthleteRepository athleteRepository;
+
+  private CompetitionParticipationRepository participationRepository;
+
   @BeforeEach
   void setUp() {
     competitionPort = mock(CompetitionPort.class);
     repository = new InMemoryRepository();
+    athleteRepository = mock(AthleteRepository.class);
+    participationRepository = mock(CompetitionParticipationRepository.class);
+    when(athleteRepository.findByCode(ATHLETE_ID)).thenReturn(Optional.of(new Athlete(ATHLETE_ID, null, null)));
+    when(participationRepository.findConfirmedCompetitionIds(ATHLETE_ID))
+        .thenReturn(Set.of("ifbb-1"));
   }
 
   @ParameterizedTest
@@ -64,7 +78,7 @@ class AthleteCompetitionUseCaseImplTest {
 
   @Test
   void isUnavailableUntilTheFirstSuccessfulRefresh() {
-    assertThatThrownBy(() -> useCaseAt(at(TODAY)).listAthleteCompetitions(ATHLETE_ID, null))
+    assertThatThrownBy(() -> useCaseAt(at(TODAY)).listAthleteCompetitions(ATHLETE_ID))
         .isInstanceOf(DataUnavailableException.class);
     verifyNoInteractions(competitionPort);
   }
@@ -76,8 +90,8 @@ class AthleteCompetitionUseCaseImplTest {
     final var useCase = useCaseAt(at(TODAY));
     useCase.refresh();
 
-    final var result = useCase.listAthleteCompetitions(ATHLETE_ID, ParticipationStatus.CONFIRMED);
-    useCase.listAthleteCompetitions(ATHLETE_ID, null);
+    final var result = useCase.listAthleteCompetitions(ATHLETE_ID);
+    useCase.listAthleteCompetitions(ATHLETE_ID);
 
     assertThat(result.athleteId()).isEqualTo(ATHLETE_ID);
     assertThat(result.items()).isEqualTo(competitions);
@@ -92,7 +106,7 @@ class AthleteCompetitionUseCaseImplTest {
     final var useCase = useCaseAt(at(TODAY));
     useCase.refresh();
 
-    assertThat(useCase.listAthleteCompetitions(ATHLETE_ID, null).items()).isEmpty();
+    assertThat(useCase.listAthleteCompetitions(ATHLETE_ID).items()).isEmpty();
   }
 
   @Test
@@ -106,7 +120,7 @@ class AthleteCompetitionUseCaseImplTest {
 
     useCase.refresh();
 
-    final var result = useCase.listAthleteCompetitions(ATHLETE_ID, null);
+    final var result = useCase.listAthleteCompetitions(ATHLETE_ID);
     assertThat(result.items()).isEqualTo(competitions);
     assertThat(result.updatedAt()).isEqualTo(at(TODAY).instant());
     assertThat(result.availability()).isEqualTo(Availability.STALE);
@@ -128,7 +142,7 @@ class AthleteCompetitionUseCaseImplTest {
 
     final var later = Clock.offset(at(TODAY), FRESHNESS_THRESHOLD.plusMinutes(1));
 
-    assertThat(useCaseAt(later).listAthleteCompetitions(ATHLETE_ID, null).availability())
+    assertThat(useCaseAt(later).listAthleteCompetitions(ATHLETE_ID).availability())
         .isEqualTo(Availability.STALE);
   }
 
@@ -139,8 +153,70 @@ class AthleteCompetitionUseCaseImplTest {
 
     final var nextSeason = useCaseAt(at(LocalDate.of(2026, 10, 1)));
 
-    assertThatThrownBy(() -> nextSeason.listAthleteCompetitions(ATHLETE_ID, null))
+    assertThatThrownBy(() -> nextSeason.listAthleteCompetitions(ATHLETE_ID))
         .isInstanceOf(DataUnavailableException.class);
+  }
+
+  @Test
+  void returnsOnlyTheCompetitionsConfirmedByTheAthlete() {
+    when(competitionPort.fetchCompetitions(any()))
+        .thenReturn(List.of(competition("ifbb-1"), competition("ifbb-2"), competition("ifbb-3")));
+    when(participationRepository.findConfirmedCompetitionIds(ATHLETE_ID))
+        .thenReturn(Set.of("ifbb-3", "ifbb-1", "ifbb-other-season"));
+    final var useCase = useCaseAt(at(TODAY));
+    useCase.refresh();
+
+    final var result = useCase.listAthleteCompetitions(ATHLETE_ID);
+
+    assertThat(result.items())
+        .extracting(AthleteCompetition::id)
+        .containsExactly("ifbb-1", "ifbb-3");
+    assertThat(result.availability()).isEqualTo(Availability.AVAILABLE);
+  }
+
+  @Test
+  void anAthleteWithoutConfirmationsHasAnEmptyCalendar() {
+    when(competitionPort.fetchCompetitions(any())).thenReturn(List.of(competition()));
+    when(participationRepository.findConfirmedCompetitionIds(ATHLETE_ID)).thenReturn(Set.of());
+    final var useCase = useCaseAt(at(TODAY));
+    useCase.refresh();
+
+    final var result = useCase.listAthleteCompetitions(ATHLETE_ID);
+
+    assertThat(result.items()).isEmpty();
+    assertThat(result.availability()).isEqualTo(Availability.AVAILABLE);
+  }
+
+  @Test
+  void anUnknownAthleteIsNotFound() {
+    when(athleteRepository.findByCode("unknown")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> useCaseAt(at(TODAY)).listAthleteCompetitions("unknown"))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void servesAnEmptyCalendarOfUnknownAvailabilityWhenTheStorageIsUnavailable() {
+    when(competitionPort.fetchCompetitions(any())).thenReturn(List.of(competition()));
+    when(participationRepository.findConfirmedCompetitionIds(ATHLETE_ID))
+        .thenThrow(new StorageUnavailableException("down", null));
+    final var useCase = useCaseAt(at(TODAY));
+    useCase.refresh();
+
+    final var result = useCase.listAthleteCompetitions(ATHLETE_ID);
+
+    assertThat(result.items()).isEmpty();
+    assertThat(result.updatedAt()).isNull();
+    assertThat(result.availability()).isEqualTo(Availability.UNKNOWN);
+  }
+
+  @Test
+  void anUnavailableStorageWhileCheckingTheAthleteAlsoServesAnEmptyCalendar() {
+    when(athleteRepository.findByCode(ATHLETE_ID))
+        .thenThrow(new StorageUnavailableException("down", null));
+
+    assertThat(useCaseAt(at(TODAY)).listAthleteCompetitions(ATHLETE_ID).availability())
+        .isEqualTo(Availability.UNKNOWN);
   }
 
   private AthleteCompetitionUseCaseImpl useCaseAt(final Clock clock) {
@@ -148,6 +224,8 @@ class AthleteCompetitionUseCaseImplTest {
         competitionPort,
         repository,
         new CompetitionCatalogProperties(FRESHNESS_THRESHOLD),
+        athleteRepository,
+        participationRepository,
         clock);
   }
 
@@ -156,8 +234,12 @@ class AthleteCompetitionUseCaseImplTest {
   }
 
   private static AthleteCompetition competition() {
+    return competition("ifbb-1");
+  }
+
+  private static AthleteCompetition competition(final String id) {
     return new AthleteCompetition(
-        "ifbb-1",
+        id,
         "Example Pro",
         LocalDate.of(2026, 11, 1),
         LocalDate.of(2026, 11, 1),
@@ -166,8 +248,7 @@ class AthleteCompetitionUseCaseImplTest {
         "Classic Physique",
         URI.create("https://www.ifbbpro.com/competition/example/"),
         "1",
-        null,
-        ParticipationStatus.PENDING);
+        null);
   }
 
   private static final class InMemoryRepository implements CompetitionCatalogRepository {

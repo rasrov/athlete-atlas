@@ -10,6 +10,7 @@ import com.athlete.atlas.config.InstagramSelectionProperties;
 import com.athlete.atlas.exception.DataUnavailableException;
 import com.athlete.atlas.exception.NotFoundException;
 import com.athlete.atlas.exception.RemoteException;
+import com.athlete.atlas.model.athlete.Athlete;
 import com.athlete.atlas.model.enums.Availability;
 import com.athlete.atlas.model.instagram.InstagramMediaType;
 import com.athlete.atlas.model.instagram.InstagramPost;
@@ -28,12 +29,11 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.lang.NonNull;
 
 /**
  * The selection rules shared with YouTube are covered in depth by AthleteYouTubeVideoServiceTest;
- * this test checks the Instagram wiring and the configuration validation.
+ * this test checks the Instagram wiring.
  */
 class AthleteInstagramPostServiceTest {
 
@@ -49,6 +49,19 @@ class AthleteInstagramPostServiceTest {
 
   private AthleteInstagramPostService service;
 
+  private static List<InstagramPost> posts(final int count) {
+    return IntStream.rangeClosed(1, count)
+        .mapToObj(
+            n ->
+                new InstagramPost(
+                    String.valueOf(n),
+                    InstagramMediaType.IMAGE,
+                    NOW.minus(Duration.ofDays(n)),
+                    URI.create("https://www.instagram.com/p/C" + n + "/"),
+                    null))
+        .toList();
+  }
+
   @BeforeEach
   void setUp() {
     instagramPort = mock(InstagramPort.class);
@@ -57,13 +70,17 @@ class AthleteInstagramPostServiceTest {
         new AthleteInstagramPostService(
             instagramPort,
             repository,
-            new InstagramSelectionProperties(Map.of(ATHLETE, USERNAME), Duration.ofHours(12)),
+            new FakeAthleteRepository(
+                new Athlete(ATHLETE, null, USERNAME), new Athlete("no-profile", null, null)),
+            new InstagramSelectionProperties(Duration.ofHours(12)),
             Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @Test
-  void anAthleteWithoutProfileIsNotFound() {
+  void anUnknownAthleteOrWithoutProfileIsNotFound() {
     assertThatThrownBy(() -> service.listAthleteInstagramPosts("unknown"))
+        .isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(() -> service.listAthleteInstagramPosts("no-profile"))
         .isInstanceOf(NotFoundException.class);
     verifyNoInteractions(instagramPort);
   }
@@ -101,39 +118,17 @@ class AthleteInstagramPostServiceTest {
     assertThat(result.availability()).isEqualTo(Availability.STALE);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"kim_angel){id}", "kim angel", "", "a_username_longer_than_thirty_chars"})
-  void rejectsInvalidUsernamesInTheConfiguration(final String username) {
-    assertThatThrownBy(
-            () -> new InstagramSelectionProperties(Map.of(ATHLETE, username), Duration.ofHours(12)))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("Invalid Instagram username configured for athlete kim-angel");
-  }
-
-  private static List<InstagramPost> posts(final int count) {
-    return IntStream.rangeClosed(1, count)
-        .mapToObj(
-            n ->
-                new InstagramPost(
-                    String.valueOf(n),
-                    InstagramMediaType.IMAGE,
-                    NOW.minus(Duration.ofDays(n)),
-                    URI.create("https://www.instagram.com/p/C" + n + "/"),
-                    null))
-        .toList();
-  }
-
   private static final class InMemoryRepository implements InstagramPostSelectionRepository {
 
     private final Map<String, SynchronizedSelection<InstagramPost>> selections = new HashMap<>();
 
     @Override
-    public Optional<SynchronizedSelection<InstagramPost>> findByAthleteId(final String athleteId) {
+    public Optional<SynchronizedSelection<InstagramPost>> findByAthleteId(@NonNull final String athleteId) {
       return Optional.ofNullable(selections.get(athleteId));
     }
 
     @Override
-    public void save(final String athleteId, final SynchronizedSelection<InstagramPost> selection) {
+    public void save(@NonNull final String athleteId, @NonNull final SynchronizedSelection<InstagramPost> selection) {
       selections.put(athleteId, selection);
     }
   }

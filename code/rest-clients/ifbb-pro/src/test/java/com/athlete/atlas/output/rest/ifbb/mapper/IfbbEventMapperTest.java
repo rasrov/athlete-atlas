@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.athlete.atlas.model.competition.AthleteCompetition;
-import com.athlete.atlas.model.competition.enums.ParticipationStatus;
 import com.athlete.atlas.output.rest.ifbb.generated.model.Event;
 import com.athlete.atlas.output.rest.ifbb.generated.model.EventVenue;
 import java.net.URI;
@@ -37,8 +36,7 @@ class IfbbEventMapperTest {
                 "Classic Physique Men’s Physique",
                 URI.create("https://www.ifbbpro.com/competition/example/"),
                 "12",
-                null,
-                ParticipationStatus.PENDING));
+                null));
   }
 
   @Test

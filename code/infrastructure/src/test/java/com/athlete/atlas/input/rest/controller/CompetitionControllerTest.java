@@ -2,7 +2,6 @@ package com.athlete.atlas.input.rest.controller;
 
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.nullValue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,7 +16,6 @@ import com.athlete.atlas.exception.DataUnavailableException;
 import com.athlete.atlas.handler.GlobalExceptionHandler;
 import com.athlete.atlas.input.rest.mapper.AthleteCompetitionMapperImpl;
 import com.athlete.atlas.model.competition.AthleteCompetition;
-import com.athlete.atlas.model.competition.enums.ParticipationStatus;
 import com.athlete.atlas.model.enums.Availability;
 import com.athlete.atlas.model.selection.AthleteSelection;
 import com.athlete.atlas.port.input.competition.AthleteCompetitionUseCase;
@@ -49,7 +47,7 @@ class CompetitionControllerTest {
 
   @Test
   void returnsTheCompetitionsWithTheContractShape() throws Exception {
-    when(athleteCompetitionUseCase.listAthleteCompetitions(ATHLETE_ID, null))
+    when(athleteCompetitionUseCase.listAthleteCompetitions(ATHLETE_ID))
         .thenReturn(selection(List.of(competition()), Availability.AVAILABLE));
 
     mockMvc
@@ -75,26 +73,36 @@ class CompetitionControllerTest {
         .andExpect(jsonPath("$.data[0].sourceId").value("12"))
         .andExpect(jsonPath("$.data[0]", hasKey("logoUrl")))
         .andExpect(jsonPath("$.data[0].logoUrl").value(nullValue()))
-        .andExpect(jsonPath("$.data[0].participation.status").value("pending"))
+        .andExpect(jsonPath("$.data[0].participation").doesNotExist())
         .andExpect(jsonPath("$.meta.athleteId").value(ATHLETE_ID))
         .andExpect(jsonPath("$.meta.updatedAt").value("2026-10-14T06:00:00Z"))
         .andExpect(jsonPath("$.meta.availability").value("available"));
   }
 
   @Test
-  void passesTheParticipationStatusFilterToTheUseCase() throws Exception {
-    when(athleteCompetitionUseCase.listAthleteCompetitions(
-            ATHLETE_ID, ParticipationStatus.CONFIRMED))
+  void anAthleteWithoutConfirmedCompetitionsGetsAnEmptyList() throws Exception {
+    when(athleteCompetitionUseCase.listAthleteCompetitions(ATHLETE_ID))
         .thenReturn(selection(List.of(), Availability.STALE));
 
     mockMvc
-        .perform(get(URL, ATHLETE_ID).queryParam("participationStatus", "confirmed"))
+        .perform(get(URL, ATHLETE_ID))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").isEmpty())
         .andExpect(jsonPath("$.meta.availability").value("stale"));
+  }
 
-    verify(athleteCompetitionUseCase)
-        .listAthleteCompetitions(ATHLETE_ID, ParticipationStatus.CONFIRMED);
+  @Test
+  void aDegradedResponseOfUnknownAvailabilityIsNotCached() throws Exception {
+    when(athleteCompetitionUseCase.listAthleteCompetitions(ATHLETE_ID))
+        .thenReturn(new AthleteSelection<>(ATHLETE_ID, List.of(), null, Availability.UNKNOWN));
+
+    mockMvc
+        .perform(get(URL, ATHLETE_ID))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(jsonPath("$.data").isEmpty())
+        .andExpect(jsonPath("$.meta.updatedAt").value(nullValue()))
+        .andExpect(jsonPath("$.meta.availability").value("unknown"));
   }
 
   @Test
@@ -109,24 +117,12 @@ class CompetitionControllerTest {
         .andExpect(jsonPath("$.detail").value("Invalid value for parameters: athleteId."))
         .andExpect(header().string("Cache-Control", "no-store"));
 
-    verify(athleteCompetitionUseCase, never()).listAthleteCompetitions(anyString(), any());
-  }
-
-  @Test
-  void rejectsAnUnknownParticipationStatusWithAProblem() throws Exception {
-    mockMvc
-        .perform(get(URL, ATHLETE_ID).queryParam("participationStatus", "foo"))
-        .andExpect(status().isBadRequest())
-        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-        .andExpect(
-            jsonPath("$.detail").value("Invalid value for parameters: participationStatus."));
-
-    verify(athleteCompetitionUseCase, never()).listAthleteCompetitions(anyString(), any());
+    verify(athleteCompetitionUseCase, never()).listAthleteCompetitions(anyString());
   }
 
   @Test
   void answersServiceUnavailableUntilTheFirstSynchronizationWithoutCaching() throws Exception {
-    when(athleteCompetitionUseCase.listAthleteCompetitions(ATHLETE_ID, null))
+    when(athleteCompetitionUseCase.listAthleteCompetitions(ATHLETE_ID))
         .thenThrow(new DataUnavailableException("not synchronized"));
 
     mockMvc
@@ -154,7 +150,6 @@ class CompetitionControllerTest {
         "Classic Physique",
         URI.create("https://www.ifbbpro.com/competition/example/"),
         "12",
-        null,
-        ParticipationStatus.PENDING);
+        null);
   }
 }

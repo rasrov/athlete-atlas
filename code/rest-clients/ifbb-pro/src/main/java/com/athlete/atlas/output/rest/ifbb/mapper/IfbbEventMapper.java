@@ -25,7 +25,6 @@ public interface IfbbEventMapper {
   @Mapping(target = "country", source = "venue.country", qualifiedByName = "optionalPlainText")
   @Mapping(target = "sourceUrl", source = "url")
   @Mapping(target = "logoUrl", ignore = true)
-  @Mapping(target = "status", constant = "PENDING")
   AthleteCompetition toDomain(Event event);
 
   @Named("externalId")

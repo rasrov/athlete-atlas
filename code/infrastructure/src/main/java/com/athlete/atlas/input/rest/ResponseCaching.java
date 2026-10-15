@@ -1,5 +1,6 @@
 package com.athlete.atlas.input.rest;
 
+import com.athlete.atlas.model.enums.Availability;
 import java.time.Duration;
 import org.springframework.http.CacheControl;
 
@@ -22,6 +23,14 @@ public final class ResponseCaching {
           .staleIfError(Duration.ofHours(1));
 
   public static final CacheControl ERROR = CacheControl.noStore();
+
+  /**
+   * Data of unknown availability is a degraded response (e.g. the storage did not respond), so it is
+   * not stored either: it would keep being served after the backend recovers.
+   */
+  public static CacheControl forAvailability(final Availability availability) {
+    return availability == Availability.UNKNOWN ? ERROR : PUBLIC_DATA;
+  }
 
   private ResponseCaching() {}
 }

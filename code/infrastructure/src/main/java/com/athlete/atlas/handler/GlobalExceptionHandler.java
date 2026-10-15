@@ -3,6 +3,7 @@ package com.athlete.atlas.handler;
 import com.athlete.atlas.exception.DataUnavailableException;
 import com.athlete.atlas.exception.NotFoundException;
 import com.athlete.atlas.exception.RemoteException;
+import com.athlete.atlas.exception.StorageUnavailableException;
 import com.athlete.atlas.exception.rest.BadRequestException;
 import com.athlete.atlas.exception.rest.RestClientErrorCode;
 import com.athlete.atlas.exception.rest.UnprocessableEntityException;
@@ -133,6 +134,16 @@ public class GlobalExceptionHandler {
         HttpStatus.SERVICE_UNAVAILABLE,
         "Data temporarily unavailable",
         "The requested data has not been synchronized yet.");
+  }
+
+  /** The storage does not respond; its error is logged but never exposed. */
+  @ExceptionHandler(StorageUnavailableException.class)
+  public ResponseEntity<Problem> handleStorageUnavailable(final StorageUnavailableException ex) {
+    log.warn("Storage unavailable: {}", ex.getMessage());
+    return problem(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "Data temporarily unavailable",
+        RestClientErrorCode.REMOTE_API_ERROR.message());
   }
 
   /**

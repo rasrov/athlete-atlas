@@ -1,10 +1,12 @@
 package com.athlete.atlas.usecase;
 
 import com.athlete.atlas.config.InstagramSelectionProperties;
+import com.athlete.atlas.model.athlete.Athlete;
 import com.athlete.atlas.model.instagram.InstagramPost;
 import com.athlete.atlas.model.selection.AthleteSelection;
 import com.athlete.atlas.port.input.instagram.AthleteInstagramPostUseCase;
 import com.athlete.atlas.port.input.instagram.RefreshInstagramPostsUseCase;
+import com.athlete.atlas.port.output.AthleteRepository;
 import com.athlete.atlas.port.output.InstagramPort;
 import com.athlete.atlas.port.output.InstagramPostSelectionRepository;
 import com.athlete.atlas.usecase.selection.SynchronizedSelectionService;
@@ -12,7 +14,6 @@ import jakarta.annotation.Nonnull;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import org.springframework.stereotype.Component;
 
 /** Latest Instagram posts of each athlete, refreshed periodically from their profile. */
@@ -27,9 +28,10 @@ public class AthleteInstagramPostService extends SynchronizedSelectionService<In
   public AthleteInstagramPostService(
       final InstagramPort instagramPort,
       final InstagramPostSelectionRepository instagramPostSelectionRepository,
+      final AthleteRepository athleteRepository,
       final InstagramSelectionProperties instagramSelectionProperties,
       final Clock clock) {
-    super("Instagram", instagramPostSelectionRepository, clock);
+    super("Instagram", instagramPostSelectionRepository, athleteRepository, clock);
     this.instagramPort = instagramPort;
     this.instagramSelectionProperties = instagramSelectionProperties;
   }
@@ -41,8 +43,8 @@ public class AthleteInstagramPostService extends SynchronizedSelectionService<In
   }
 
   @Override
-  protected Map<String, String> accounts() {
-    return instagramSelectionProperties.usernames();
+  protected String account(final Athlete athlete) {
+    return athlete.instagramUsername();
   }
 
   @Override

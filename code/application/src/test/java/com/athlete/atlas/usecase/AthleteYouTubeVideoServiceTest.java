@@ -3,13 +3,18 @@ package com.athlete.atlas.usecase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.athlete.atlas.config.YouTubeSelectionProperties;
 import com.athlete.atlas.exception.DataUnavailableException;
 import com.athlete.atlas.exception.NotFoundException;
 import com.athlete.atlas.exception.RemoteException;
+import com.athlete.atlas.exception.StorageUnavailableException;
+import com.athlete.atlas.model.athlete.Athlete;
 import com.athlete.atlas.model.enums.Availability;
 import com.athlete.atlas.model.youtube.YouTubeVideo;
 import com.athlete.atlas.model.selection.SynchronizedSelection;
@@ -22,7 +27,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,6 +46,8 @@ class AthleteYouTubeVideoServiceTest {
 
   private InMemoryRepository repository;
 
+  private FakeAthleteRepository athletes;
+
   private MutableClock clock;
 
   private AthleteYouTubeVideoService service;
@@ -51,14 +57,69 @@ class AthleteYouTubeVideoServiceTest {
     youTubePort = mock(YouTubePort.class);
     repository = new InMemoryRepository();
     clock = new MutableClock(T0);
-    service = serviceWithChannels(Map.of(ATHLETE, CHANNEL));
+    athletes = new FakeAthleteRepository(new Athlete(ATHLETE, CHANNEL, null));
+    service =
+        new AthleteYouTubeVideoService(
+            youTubePort,
+            repository,
+            athletes,
+            new YouTubeSelectionProperties(Duration.ofHours(12)),
+            clock);
   }
 
   @Test
-  void anAthleteWithoutChannelIsNotFound() {
+  void anUnknownAthleteIsNotFound() {
     assertThatThrownBy(() -> service.listAthleteYouTubeVideos("unknown"))
         .isInstanceOf(NotFoundException.class);
     verifyNoInteractions(youTubePort);
+  }
+
+  @Test
+  void anAthleteWithoutChannelIsNotFoundAndIsNotRefreshed() {
+    athletes.replaceAll(new Athlete(ATHLETE, CHANNEL, null), new Athlete("no-channel", null, null));
+
+    service.refreshAll();
+
+    verify(youTubePort).fetchLatestVideos(CHANNEL);
+    verifyNoMoreInteractions(youTubePort);
+    assertThatThrownBy(() -> service.listAthleteYouTubeVideos("no-channel"))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void anUnavailableStorageOnReadIsPropagated() {
+    athletes.setAvailable(false);
+
+    assertThatThrownBy(() -> service.listAthleteYouTubeVideos(ATHLETE))
+        .isInstanceOf(StorageUnavailableException.class);
+  }
+
+  @Test
+  void anUnavailableStorageOnRefreshKeepsThePreviousSelectionAsStale() {
+    when(youTubePort.fetchLatestVideos(CHANNEL)).thenReturn(videos(6));
+    service.refreshAll();
+    athletes.setAvailable(false);
+
+    service.refreshAll();
+
+    verify(youTubePort, times(1)).fetchLatestVideos(CHANNEL);
+    athletes.setAvailable(true);
+    final var result = service.listAthleteYouTubeVideos(ATHLETE);
+    assertThat(result.items()).isEqualTo(videos(6));
+    assertThat(result.updatedAt()).isEqualTo(T0);
+    assertThat(result.availability()).isEqualTo(Availability.STALE);
+  }
+
+  @Test
+  void anUnavailableStorageOnTheFirstRefreshLeavesTheDataUnavailable() {
+    athletes.setAvailable(false);
+
+    service.refreshAll();
+
+    verifyNoInteractions(youTubePort);
+    athletes.setAvailable(true);
+    assertThatThrownBy(() -> service.listAthleteYouTubeVideos(ATHLETE))
+        .isInstanceOf(DataUnavailableException.class);
   }
 
   @Test
@@ -185,10 +246,7 @@ class AthleteYouTubeVideoServiceTest {
 
   @Test
   void aFailingAthleteDoesNotStopTheRefreshOfTheOthers() {
-    final var channels = new LinkedHashMap<String, String>();
-    channels.put("failing", "UCfailing");
-    channels.put(ATHLETE, CHANNEL);
-    service = serviceWithChannels(channels);
+    athletes.replaceAll(new Athlete("failing", "UCfailing", null), new Athlete(ATHLETE, CHANNEL, null));
     when(youTubePort.fetchLatestVideos("UCfailing"))
         .thenThrow(new RemoteException("[youtube_data_api] upstream error", 503, null));
     when(youTubePort.fetchLatestVideos(CHANNEL)).thenReturn(videos(6));
@@ -198,14 +256,6 @@ class AthleteYouTubeVideoServiceTest {
     assertThat(service.listAthleteYouTubeVideos(ATHLETE).items()).hasSize(6);
     assertThatThrownBy(() -> service.listAthleteYouTubeVideos("failing"))
         .isInstanceOf(DataUnavailableException.class);
-  }
-
-  private AthleteYouTubeVideoService serviceWithChannels(final Map<String, String> channels) {
-    return new AthleteYouTubeVideoService(
-        youTubePort,
-        repository,
-        new YouTubeSelectionProperties(channels, Duration.ofHours(12)),
-        clock);
   }
 
   private static List<YouTubeVideo> videos(final int count) {

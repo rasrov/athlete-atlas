@@ -1,0 +1,20 @@
+# Local development database. Start it with: docker compose up -d
+# The credentials are for local use only and match the defaults of application.yml.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: athlete_atlas
+      POSTGRES_USER: athlete_atlas
+      POSTGRES_PASSWORD: athlete_atlas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U athlete_atlas -d athlete_atlas"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

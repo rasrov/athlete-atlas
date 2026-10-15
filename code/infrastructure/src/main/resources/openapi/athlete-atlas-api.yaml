@@ -14,11 +14,13 @@ servers:
 security: [ ]
 tags:
   - name: Competition
-    description: Competition calendar and editorial participation decisions
+    description: Competitions the athlete participates in
   - name: InstagramPost
     description: Instagram posts and preview images
   - name: YouTubeVideo
     description: YouTube video metadata and links
+  - name: HallOfFame
+    description: Competition results of the athlete
   - name: Sponsor
     description: Athlete sponsors and discount codes
 paths:
@@ -27,36 +29,32 @@ paths:
       operationId: listAthleteCompetitions
       tags:
         - Competition
-      summary: List competitions with athlete participation
-      description: Sort by startDate ascending, then id ascending. Include professional Classic Physique
-        events; exclude names containing natural and Natural/Naturals words in Classic Physique division
-        lines, retaining Masters. Participation belongs to this athlete and event edition, not another
-        year. Default to pending when no editorial decision exists. The backend fixes the calendar window
+      summary: List the competitions the athlete participates in
+      description: Return only the competitions of the calendar window in which the athlete has confirmed
+        their participation; competitions without a confirmation are not returned. Sort by startDate
+        ascending, then id ascending. Include professional Classic Physique events; exclude names
+        containing natural and Natural/Naturals words in Classic Physique division lines, retaining
+        Masters. Participation belongs to this athlete and event edition, not another year. The backend
+        fixes the calendar window
         to the season containing the current date, from October 1 (inclusive) to October 1 of the
         following year (exclusive); dates before October 1 belong to the season that began the previous
         October. Determine the current date using Europe/Madrid. For requests from 2026-10-01 to
         2027-09-30, windowStart is 2026-10-01 and windowEndExclusive is 2027-10-01. The new season is
         synchronized at the start of October 1. Include overlapping events when endDate >= windowStart
         and startDate < windowEndExclusive;
-        event endDate remains inclusive. Apply this window and participationStatus with AND. Return all
-        matching events in one response, without pagination, truncation or an item-count cap. Competitions
+        event endDate remains inclusive. Return all matching events in one response, without pagination,
+        truncation or an item-count cap. Competitions
         are synchronized periodically by the backend, never on request. On a failed synchronization, the
         previous data is kept and meta.availability is stale. Return 503 only when no successful
-        synchronization of the current window exists yet. Only the
-        participationStatus query parameter is supported; reject limit, offset, from, to and any other
-        query parameter with 400.
+        synchronization of the current window exists yet. If the participations cannot be read, return
+        an empty data array with meta.availability unknown and Cache-Control no-store. No query parameters
+        are supported; reject limit, offset, from, to and any other query parameter with 400.
       parameters:
         - $ref: '#/components/parameters/AthleteId'
-        - name: participationStatus
-          in: query
-          schema:
-            $ref: '#/components/schemas/ParticipationStatus'
-          description: Omit to include all statuses. Use confirmed to select competitions where the athlete
-            participates.
       responses:
         '200':
-          description: All matching competitions in the fixed annual window, without pagination; data
-            may be empty. Fictional example.
+          description: Competitions of the fixed annual window in which the athlete participates, without
+            pagination; data may be empty. Fictional example.
           headers:
             Cache-Control:
               $ref: '#/components/headers/CacheControlPublic'
@@ -76,8 +74,6 @@ paths:
                     sourceUrl: https://www.ifbbpro.com/competition/example/
                     sourceId: '12345'
                     logoUrl: null
-                    participation:
-                      status: pending
                 meta:
                   athleteId: kim-angel
                   updatedAt: null
@@ -220,6 +216,64 @@ paths:
                   athleteId: kim-angel
                   updatedAt: null
                   availability: unknown
+        '400':
+          $ref: '#/components/responses/Error400'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/athletes/{athleteId}/hall-of-fame:
+    get:
+      operationId: listAthleteHallOfFame
+      tags:
+        - HallOfFame
+      summary: List the competition results of the athlete
+      description: Results ordered by date descending, then by creation order. Images keep their editorial
+        order. Results are editorial data stored by the backend, not synchronized with a provider, so
+        meta.availability is always available and meta.updatedAt is the last modification of the results
+        (null when there are none). No query parameters are supported; reject any query parameter with
+        400. Return 503 when the storage does not respond.
+      parameters:
+        - $ref: '#/components/parameters/AthleteId'
+      responses:
+        '200':
+          description: All results of the athlete, without pagination; data may be empty. Fictional
+            example.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlPublic'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallOfFameCollection'
+              example:
+                data:
+                  - id: '51'
+                    date: '2026-09-12'
+                    category: Classic Physique
+                    competitionName: Example Pro Show
+                    placement: 5.º Puesto
+                    officialUrl: https://www.ifbbpro.com/competition/example-pro-show/
+                    competitionId: ifbb-12345
+                    images:
+                      - url: https://images.example.com/hall-of-fame/kim-angel/2026-09-12-1.webp
+                        altText: On stage at the Example Pro Show
+                      - url: https://images.example.com/hall-of-fame/kim-angel/2026-09-12-2.webp
+                        altText: null
+                  - id: '1'
+                    date: '2025-11-08'
+                    category: Classic Physique
+                    competitionName: Example Championship
+                    placement: 16.º Top mundial
+                    officialUrl: null
+                    competitionId: null
+                    images: []
+                meta:
+                  athleteId: kim-angel
+                  updatedAt: '2026-10-15T18:00:00Z'
+                  availability: available
         '400':
           $ref: '#/components/responses/Error400'
         '404':
@@ -390,22 +444,6 @@ components:
       pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*$
       description: Opaque API identifier. Do not derive identity from name similarity or assume it equals
         a provider ID.
-    ParticipationStatus:
-      type: string
-      enum:
-        - pending
-        - confirmed
-        - absent
-      description: 'pending: no editorial decision; confirmed: participating; absent: not participating.
-        Do not infer absent from incomplete external lists.'
-    Participation:
-      type: object
-      additionalProperties: false
-      required:
-        - status
-      properties:
-        status:
-          $ref: '#/components/schemas/ParticipationStatus'
     Competition:
       type: object
       additionalProperties: false
@@ -420,7 +458,6 @@ components:
         - sourceUrl
         - sourceId
         - logoUrl
-        - participation
       properties:
         id:
           $ref: '#/components/schemas/Id'
@@ -461,8 +498,6 @@ components:
           description: Editorial logo, not an imported poster used by default. null means the frontend
             should use its generic fallback.
           nullable: true
-        participation:
-          $ref: '#/components/schemas/Participation'
     InstagramPost:
       type: object
       additionalProperties: false
@@ -531,6 +566,72 @@ components:
           format: uri
           pattern: ^https://
           nullable: true
+    HallOfFameEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - date
+        - category
+        - competitionName
+        - placement
+        - officialUrl
+        - competitionId
+        - images
+      properties:
+        id:
+          $ref: '#/components/schemas/Id'
+        date:
+          type: string
+          format: date
+          description: Date of the competition (first day if it lasts several days). Local event date; do
+            not convert to UTC. The year is derived from it.
+        category:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Classic Physique
+        competitionName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        placement:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Result as displayed, without further formatting.
+          example: 16.º Top mundial
+        officialUrl:
+          type: string
+          format: uri
+          pattern: ^https://
+          nullable: true
+        competitionId:
+          allOf:
+            - $ref: '#/components/schemas/Id'
+          nullable: true
+          description: Calendar competition of this result, when known.
+        images:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/HallOfFameImage'
+          description: Images in editorial order; may be empty.
+    HallOfFameImage:
+      type: object
+      additionalProperties: false
+      required:
+        - url
+        - altText
+      properties:
+        url:
+          type: string
+          format: uri
+          pattern: ^https://
+        altText:
+          type: string
+          nullable: true
+          description: Alternative text for accessibility.
     Sponsor:
       type: object
       additionalProperties: false
@@ -648,7 +749,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Competition'
-          description: All competitions matching the fixed annual window and optional participation filter.
+          description: All competitions of the fixed annual window in which the athlete participates.
             No item-count cap or pagination.
         meta:
           $ref: '#/components/schemas/Metadata'
@@ -684,6 +785,20 @@ components:
           uniqueItems: true
           description: Up to 6 items with distinct IDs; fewer (even none) when the channel has fewer
             eligible videos. Duplicate IDs are invalid even if other fields differ.
+        meta:
+          $ref: '#/components/schemas/Metadata'
+    HallOfFameCollection:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/HallOfFameEntry'
+          description: All results of the athlete, without pagination; may be empty.
         meta:
           $ref: '#/components/schemas/Metadata'
     SponsorCollection:

@@ -32,6 +32,7 @@
         <module>boot</module>
         <module>domain</module>
         <module>infrastructure</module>
+        <module>persistence</module>
         <module>rest-clients</module>
         <module>common</module>
     </modules>
