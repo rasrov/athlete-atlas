@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
-/** Metadata of the synchronized selections (YouTube, Instagram) in the API contract. */
+/** Metadata of the synchronized data (competitions, YouTube, Instagram) in the API contract. */
 public final class SelectionMetadataMapper {
 
   private SelectionMetadataMapper() {}

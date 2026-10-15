@@ -5,6 +5,7 @@ import com.athlete.atlas.infrastructure.api.model.CompetitionCollection;
 import com.athlete.atlas.infrastructure.api.model.ParticipationStatus;
 import com.athlete.atlas.input.rest.mapper.AthleteCompetitionMapper;
 import com.athlete.atlas.port.input.competition.AthleteCompetitionUseCase;
+import com.athlete.atlas.input.rest.ResponseCaching;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +24,10 @@ public class CompetitionController implements CompetitionApi {
   public ResponseEntity<CompetitionCollection> listAthleteCompetitions(
       @Nonnull final String athleteId, @Nullable final ParticipationStatus participationStatus) {
     final var status = athleteCompetitionMapper.toDomain(participationStatus);
-    final var athleteCompetitions =
-        athleteCompetitionUseCase.listAthleteCompetitions(athleteId, status);
+    final var selection = athleteCompetitionUseCase.listAthleteCompetitions(athleteId, status);
 
-    return ResponseEntity.ok(
-        athleteCompetitionMapper.toDtoCollection(athleteId, athleteCompetitions));
+    return ResponseEntity.ok()
+        .cacheControl(ResponseCaching.PUBLIC_DATA)
+        .body(athleteCompetitionMapper.toDtoCollection(selection));
   }
 }

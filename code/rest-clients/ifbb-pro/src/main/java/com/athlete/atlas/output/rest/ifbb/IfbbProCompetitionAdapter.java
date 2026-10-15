@@ -20,7 +20,6 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -57,7 +56,6 @@ public class IfbbProCompetitionAdapter implements CompetitionPort {
   }
 
   @Override
-  @Cacheable(cacheNames = "ifbbEvents")
   public List<AthleteCompetition> fetchCompetitions(@Nonnull final DateRange range) {
     final var pageSize = ifbbProClientProperties.pageSize();
     final var events =

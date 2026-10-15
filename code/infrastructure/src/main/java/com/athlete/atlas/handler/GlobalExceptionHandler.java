@@ -7,6 +7,7 @@ import com.athlete.atlas.exception.rest.BadRequestException;
 import com.athlete.atlas.exception.rest.RestClientErrorCode;
 import com.athlete.atlas.exception.rest.UnprocessableEntityException;
 import com.athlete.atlas.infrastructure.api.model.Problem;
+import com.athlete.atlas.input.rest.ResponseCaching;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -33,7 +34,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 /**
  * Translates exceptions into the {@code Problem} responses (application/problem+json) defined in
  * the API contract. The detail never exposes internal messages, credentials or provider responses;
- * for invalid requests it only names the offending parameters.
+ * for invalid requests it only names the offending parameters. Errors are never cached.
  */
 @Slf4j
 @RestControllerAdvice
@@ -183,6 +184,7 @@ public class GlobalExceptionHandler {
   private static ResponseEntity<Problem> problem(
       final HttpStatusCode status, final String title, final String detail) {
     return ResponseEntity.status(status)
+        .cacheControl(ResponseCaching.ERROR)
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)
         .body(new Problem(ABOUT_BLANK, title, status.value(), detail));
   }

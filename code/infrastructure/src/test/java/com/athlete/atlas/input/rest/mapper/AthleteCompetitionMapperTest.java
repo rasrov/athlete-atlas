@@ -7,8 +7,12 @@ import com.athlete.atlas.infrastructure.api.model.Metadata;
 import com.athlete.atlas.infrastructure.api.model.Participation;
 import com.athlete.atlas.model.competition.AthleteCompetition;
 import com.athlete.atlas.model.competition.enums.ParticipationStatus;
+import com.athlete.atlas.model.enums.Availability;
+import com.athlete.atlas.model.selection.AthleteSelection;
 import java.net.URI;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -63,19 +67,31 @@ class AthleteCompetitionMapperTest {
   }
 
   @Test
-  void buildsTheCollectionWithUnknownFreshnessMetadata() {
+  void buildsTheCollectionWithTheSynchronizationMetadata() {
     final var competition = competition(ParticipationStatus.PENDING, "Madrid", "Spain");
 
-    final var collection = mapper.toDtoCollection("kim-angel", List.of(competition));
+    final var collection =
+        mapper.toDtoCollection(selection(List.of(competition), Availability.STALE));
 
     assertThat(collection.getData()).containsExactly(mapper.toDto(competition));
     assertThat(collection.getMeta())
-        .isEqualTo(new Metadata("kim-angel", null, Metadata.AvailabilityEnum.UNKNOWN));
+        .isEqualTo(
+            new Metadata(
+                "kim-angel",
+                OffsetDateTime.parse("2026-10-14T06:00:00Z"),
+                Metadata.AvailabilityEnum.STALE));
   }
 
   @Test
-  void anEmptyListIsAnEmptyCollection() {
-    assertThat(mapper.toDtoCollection("kim-angel", List.of()).getData()).isEmpty();
+  void anEmptySelectionIsAnEmptyCollection() {
+    assertThat(mapper.toDtoCollection(selection(List.of(), Availability.AVAILABLE)).getData())
+        .isEmpty();
+  }
+
+  private static AthleteSelection<AthleteCompetition> selection(
+      final List<AthleteCompetition> competitions, final Availability availability) {
+    return new AthleteSelection<>(
+        "kim-angel", competitions, Instant.parse("2026-10-14T06:00:00Z"), availability);
   }
 
   private static AthleteCompetition competition(

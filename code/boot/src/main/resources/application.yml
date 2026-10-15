@@ -1,10 +1,7 @@
-spring:
-  cache:
-    type: caffeine
-    cache-names: ifbbEvents
-    caffeine:
-      # In-memory cache per instance. recordStats exposes hit/miss metrics via Actuator/Prometheus.
-      spec: maximumSize=500,expireAfterWrite=6h,recordStats
+app:
+  # Zone of the API contract for local dates (competition season, season-start-cron), whatever
+  # the time zone of the server. Instants (updatedAt) are always served in UTC.
+  time-zone: Europe/Madrid
 
 rest-clients:
   ifbb-pro:
@@ -37,6 +34,16 @@ rest-clients:
     read-timeout: 30s
     media-limit: 50
     selection-size: 3
+
+competitions:
+  # Requests are served from the stored catalog and never call the IFBB website.
+  refresh-initial-delay: 0s
+  refresh-interval: 6h
+  # Extra refresh when a new season begins (October 1, app.time-zone), so that the calendar of
+  # the new season does not wait up to refresh-interval to be available.
+  season-start-cron: "0 0 0 1 10 *"
+  # A catalog older than this is reported as stale even if its last refresh succeeded.
+  freshness-threshold: 12h
 
 youtube:
   # TODO: move the athlete -> YouTube channel association to storage once the backend has a database.

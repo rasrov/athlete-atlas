@@ -4,6 +4,7 @@ import com.athlete.atlas.infrastructure.api.YouTubeVideoApi;
 import com.athlete.atlas.infrastructure.api.model.YouTubeVideoCollection;
 import com.athlete.atlas.input.rest.mapper.AthleteYouTubeVideoMapper;
 import com.athlete.atlas.port.input.youtube.AthleteYouTubeVideoUseCase;
+import com.athlete.atlas.input.rest.ResponseCaching;
 import jakarta.annotation.Nonnull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,8 @@ public class YouTubeVideoController implements YouTubeVideoApi {
       @Nonnull final String athleteId) {
     final var selection = athleteYouTubeVideoUseCase.listAthleteYouTubeVideos(athleteId);
 
-    return ResponseEntity.ok(athleteYouTubeVideoMapper.toDtoCollection(selection));
+    return ResponseEntity.ok()
+        .cacheControl(ResponseCaching.PUBLIC_DATA)
+        .body(athleteYouTubeVideoMapper.toDtoCollection(selection));
   }
 }

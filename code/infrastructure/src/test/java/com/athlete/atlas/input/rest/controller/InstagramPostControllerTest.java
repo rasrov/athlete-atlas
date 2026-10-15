@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -59,6 +60,7 @@ class InstagramPostControllerTest {
     mockMvc
         .perform(get(URL, ATHLETE_ID))
         .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "max-age=300, public, stale-if-error=3600, stale-while-revalidate=60"))
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.data.length()").value(3))
         .andExpect(jsonPath("$.data[0].id").value("3"))
@@ -106,6 +108,7 @@ class InstagramPostControllerTest {
     mockMvc
         .perform(get(URL, ATHLETE_ID))
         .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string("Cache-Control", "no-store"))
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.title").value("Data temporarily unavailable"));
   }

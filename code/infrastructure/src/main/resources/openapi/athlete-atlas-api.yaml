@@ -32,12 +32,17 @@ paths:
         events; exclude names containing natural and Natural/Naturals words in Classic Physique division
         lines, retaining Masters. Participation belongs to this athlete and event edition, not another
         year. Default to pending when no editorial decision exists. The backend fixes the calendar window
-        from September 1 of the current calendar year (inclusive) to September 1 of the following year
-        (exclusive). Determine the current year once per request using Europe/Madrid, including requests
-        made before September. For requests in 2026, windowStart is 2026-09-01 and windowEndExclusive
-        is 2027-09-01. Include overlapping events when endDate >= windowStart and startDate < windowEndExclusive;
+        to the season containing the current date, from October 1 (inclusive) to October 1 of the
+        following year (exclusive); dates before October 1 belong to the season that began the previous
+        October. Determine the current date using Europe/Madrid. For requests from 2026-10-01 to
+        2027-09-30, windowStart is 2026-10-01 and windowEndExclusive is 2027-10-01. The new season is
+        synchronized at the start of October 1. Include overlapping events when endDate >= windowStart
+        and startDate < windowEndExclusive;
         event endDate remains inclusive. Apply this window and participationStatus with AND. Return all
-        matching events in one response, without pagination, truncation or an item-count cap. Only the
+        matching events in one response, without pagination, truncation or an item-count cap. Competitions
+        are synchronized periodically by the backend, never on request. On a failed synchronization, the
+        previous data is kept and meta.availability is stale. Return 503 only when no successful
+        synchronization of the current window exists yet. Only the
         participationStatus query parameter is supported; reject limit, offset, from, to and any other
         query parameter with 400.
       parameters:
@@ -52,6 +57,9 @@ paths:
         '200':
           description: All matching competitions in the fixed annual window, without pagination; data
             may be empty. Fictional example.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlPublic'
           content:
             application/json:
               schema:
@@ -104,6 +112,9 @@ paths:
           description: Up to 3 distinct items of the latest successful synchronization; fewer when the
             profile has fewer eligible posts. Preview images may be null; missing previews do not reduce
             the item count. Fictional examples.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlPublic'
           content:
             application/json:
               schema:
@@ -160,6 +171,9 @@ paths:
           description: Up to 6 distinct items of the latest successful synchronization; fewer when the
             channel has fewer eligible videos. Preview images may be null; missing previews do not reduce
             the item count. Fictional examples.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlPublic'
           content:
             application/json:
               schema:
@@ -286,6 +300,21 @@ components:
         default: 0
       description: Offset within the filtered results. An offset beyond the total returns an empty data
         array.
+  headers:
+    CacheControlPublic:
+      description: Public data, identical for every client and synchronized every few hours. Browsers
+        and shared caches (CDN) may reuse it for 5 minutes, keep serving it for 1 more minute while
+        they revalidate, and for up to 1 hour while the backend answers with errors.
+      schema:
+        type: string
+        example: max-age=300, public, stale-if-error=3600, stale-while-revalidate=60
+    CacheControlNoStore:
+      description: Errors are never stored, so that a transient error is not served once the data is
+        available.
+      schema:
+        type: string
+        enum:
+          - no-store
   responses:
     Error400:
       description: Invalid parameters
@@ -298,6 +327,9 @@ components:
             title: Invalid parameters
             status: 400
             detail: Invalid parameters. No credentials or internal provider responses are exposed.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
     Error404:
       description: Athlete not found
       content:
@@ -309,6 +341,9 @@ components:
             title: Athlete not found
             status: 404
             detail: Athlete not found. No credentials or internal provider responses are exposed.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
     Error429:
       description: Too many requests
       content:
@@ -321,6 +356,8 @@ components:
             status: 429
             detail: Too many requests. No credentials or internal provider responses are exposed.
       headers:
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
         Retry-After:
           description: Optional suggested delay in seconds before retrying.
           schema:
@@ -338,6 +375,8 @@ components:
             status: 503
             detail: Data temporarily unavailable. No credentials or internal provider responses are exposed.
       headers:
+        Cache-Control:
+          $ref: '#/components/headers/CacheControlNoStore'
         Retry-After:
           description: Optional suggested delay in seconds before retrying.
           schema:
