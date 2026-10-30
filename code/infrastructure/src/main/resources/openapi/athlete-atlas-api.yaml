@@ -4,8 +4,9 @@ info:
   version: 0.1.0
   description:
     Athlete Public API provides athlete competition calendars, social media posts and videos, and sponsor
-    relationships. The API is read-only and does not require authentication. It is intended for public
-    consumption by websites, apps and other services. The API is hosted on GitHub Pages and does not
+    relationships. Read endpoints are public and do not require authentication. They are intended for
+    public consumption by websites, apps and other services. Write endpoints are disabled by default
+    (api.write-enabled) and must not be exposed publicly until authentication is defined. The API is hosted on GitHub Pages and does not
     implement the backend origin; the proposed path is relative to the backend origin.
 servers:
   - url: /api/v1
@@ -15,6 +16,9 @@ security: [ ]
 tags:
   - name: Competition
     description: Competitions the athlete participates in
+  - name: CompetitionParticipation
+    description: Confirmation of the athlete participation in competitions. Write endpoints, disabled
+      by default.
   - name: InstagramPost
     description: Instagram posts and preview images
   - name: YouTubeVideo
@@ -78,6 +82,43 @@ paths:
                   athleteId: kim-angel
                   updatedAt: null
                   availability: unknown
+        '400':
+          $ref: '#/components/responses/Error400'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/athletes/{athleteId}/competitions/{competitionId}/participation:
+    put:
+      operationId: setAthleteCompetitionParticipation
+      tags:
+        - CompetitionParticipation
+      summary: Confirm or withdraw the athlete participation in a competition
+      description: Sets whether the athlete attends a competition of the current season. The operation is
+        idempotent; repeating it has the same effect. Withdrawing a competition that was never confirmed
+        succeeds without changes. Only competitions of the current calendar window can be updated. No
+        query parameters are supported; reject any query parameter with 400. A missing, malformed or
+        non-JSON body and a Content-Type other than application/json are rejected with 400. Unknown
+        body fields are ignored.
+      parameters:
+        - $ref: '#/components/parameters/AthleteId'
+        - $ref: '#/components/parameters/CompetitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipationUpdate'
+            example:
+              confirmed: true
+      responses:
+        '204':
+          description: Participation updated.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
         '400':
           $ref: '#/components/responses/Error400'
         '404':
@@ -345,6 +386,14 @@ components:
       schema:
         $ref: '#/components/schemas/Id'
       example: kim-angel
+    CompetitionId:
+      name: competitionId
+      in: path
+      required: true
+      description: API identifier of the competition, as returned by listAthleteCompetitions.
+      schema:
+        $ref: '#/components/schemas/Id'
+      example: ifbb-12345
     Offset:
       name: offset
       in: query
@@ -385,16 +434,16 @@ components:
         Cache-Control:
           $ref: '#/components/headers/CacheControlNoStore'
     Error404:
-      description: Athlete not found
+      description: Resource not found
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
           example:
             type: about:blank
-            title: Athlete not found
+            title: Resource not found
             status: 404
-            detail: Athlete not found. No credentials or internal provider responses are exposed.
+            detail: Resource not found. No credentials or internal provider responses are exposed.
       headers:
         Cache-Control:
           $ref: '#/components/headers/CacheControlNoStore'
@@ -632,6 +681,15 @@ components:
           type: string
           nullable: true
           description: Alternative text for accessibility.
+    ParticipationUpdate:
+      type: object
+      description: Unknown fields are ignored.
+      required:
+        - confirmed
+      properties:
+        confirmed:
+          type: boolean
+          description: true to confirm the participation of the athlete, false to withdraw it.
     Sponsor:
       type: object
       additionalProperties: false

@@ -12,4 +12,12 @@ public interface CompetitionParticipationRepository {
    * @throws com.athlete.atlas.exception.StorageUnavailableException if the storage does not respond.
    */
   Set<String> findConfirmedCompetitionIds(@Nonnull String athleteCode);
+
+  /**
+   * Sets whether the athlete attends the competition. Withdrawing a competition without a row does
+   * not create one, and setting the current value writes nothing.
+   *
+   * @throws com.athlete.atlas.exception.StorageUnavailableException if the storage does not respond.
+   */
+  void setConfirmed(@Nonnull String athleteCode, @Nonnull String competitionId, boolean confirmed);
 }

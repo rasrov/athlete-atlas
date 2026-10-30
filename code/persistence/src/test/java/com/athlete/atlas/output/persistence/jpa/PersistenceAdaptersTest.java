@@ -203,6 +203,84 @@ class PersistenceAdaptersTest {
         .isZero();
   }
 
+  @Test
+  void confirmingCreatesTheParticipation() {
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", true);
+
+    assertThat(participation("ifbb-1")).isEqualTo(new Row(true, 0));
+  }
+
+  @Test
+  void confirmingAWithdrawnParticipationConfirmsItAgain() {
+    insertParticipation(athleteId("kim-angel"), "ifbb-1", false);
+
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", true);
+
+    assertThat(participation("ifbb-1")).isEqualTo(new Row(true, 1));
+  }
+
+  @Test
+  void withdrawingAConfirmedParticipationKeepsTheRow() {
+    insertParticipation(athleteId("kim-angel"), "ifbb-1", true);
+
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", false);
+
+    assertThat(participation("ifbb-1")).isEqualTo(new Row(false, 1));
+  }
+
+  @Test
+  void withdrawingACompetitionThatWasNeverConfirmedCreatesNoRow() {
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", false);
+
+    assertThat(participationCount()).isZero();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void repeatingTheSameValueWritesNothing(final boolean confirmed) {
+    insertParticipation(athleteId("kim-angel"), "ifbb-1", confirmed);
+
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", confirmed);
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", confirmed);
+
+    assertThat(participation("ifbb-1")).isEqualTo(new Row(confirmed, 0));
+  }
+
+  @Test
+  void anUnknownAthleteWritesNothing() {
+    participationRepository.setConfirmed("unknown", "ifbb-1", true);
+
+    assertThat(participationCount()).isZero();
+  }
+
+  @Test
+  void settingAParticipationEvictsTheConfirmedCompetitionsOfTheAthlete() {
+    assertThat(participationRepository.findConfirmedCompetitionIds("kim-angel")).isEmpty();
+
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", true);
+    assertThat(participationRepository.findConfirmedCompetitionIds("kim-angel"))
+        .containsExactly("ifbb-1");
+
+    participationRepository.setConfirmed("kim-angel", "ifbb-1", false);
+    assertThat(participationRepository.findConfirmedCompetitionIds("kim-angel")).isEmpty();
+  }
+
+  private record Row(boolean confirmed, int version) {}
+
+  private Row participation(final String competitionId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT confirmed, version FROM competition_participation"
+            + " WHERE athlete_id = ? AND competition_id = ?",
+        (rs, rowNum) -> new Row(rs.getBoolean("confirmed"), rs.getInt("version")),
+        athleteId("kim-angel"),
+        competitionId);
+  }
+
+  private long participationCount() {
+    return jdbcTemplate.queryForObject(
+        "SELECT count(*) FROM competition_participation", Long.class);
+  }
+
   private long athleteId(final String code) {
     return jdbcTemplate.queryForObject("SELECT id FROM athlete WHERE code = ?", Long.class, code);
   }

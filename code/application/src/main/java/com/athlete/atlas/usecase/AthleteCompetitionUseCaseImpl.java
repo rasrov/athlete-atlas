@@ -13,6 +13,7 @@ import com.athlete.atlas.model.selection.AthleteSelection;
 import com.athlete.atlas.model.selection.SynchronizedSelection;
 import com.athlete.atlas.port.input.competition.AthleteCompetitionUseCase;
 import com.athlete.atlas.port.input.competition.RefreshCompetitionsUseCase;
+import com.athlete.atlas.port.input.competition.SetCompetitionParticipationUseCase;
 import com.athlete.atlas.port.output.AthleteRepository;
 import com.athlete.atlas.port.output.CompetitionCatalogRepository;
 import com.athlete.atlas.port.output.CompetitionParticipationRepository;
@@ -35,12 +36,16 @@ import org.springframework.stereotype.Component;
  * <p>Only the competitions confirmed by the athlete are served; the confirmations come from the
  * storage, which only returns the confirmed ones. If the storage does not respond, an empty
  * calendar of unknown availability is served instead of an error.
+ *
+ * <p>The athlete confirms or withdraws the competitions of the current catalog.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AthleteCompetitionUseCaseImpl
-    implements AthleteCompetitionUseCase, RefreshCompetitionsUseCase {
+    implements AthleteCompetitionUseCase,
+        RefreshCompetitionsUseCase,
+        SetCompetitionParticipationUseCase {
 
   private final CompetitionPort competitionPort;
 
@@ -71,16 +76,7 @@ public class AthleteCompetitionUseCaseImpl
       return new AthleteSelection<>(athleteId, List.of(), null, Availability.UNKNOWN);
     }
 
-    final var season = currentSeason();
-    final var competitions =
-        competitionCatalogRepository
-            .find()
-            .filter(catalog -> catalog.season().equals(season))
-            .map(CompetitionCatalog::competitions)
-            .orElseThrow(
-                () ->
-                    new DataUnavailableException(
-                        "Competitions of season " + season.start() + " not synchronized yet"));
+    final var competitions = currentCatalog();
     final var items =
         competitions.items().stream()
             .filter(competition -> confirmedIds.contains(competition.id()))
@@ -91,6 +87,33 @@ public class AthleteCompetitionUseCaseImpl
         competitions.updatedAt(),
         competitions.availability(
             clock.instant(), competitionCatalogProperties.freshnessThreshold()));
+  }
+
+  /**
+   * Only competitions of the current catalog can be set, so that a mistyped id does not create a
+   * row that never matches a competition. Unlike the read, an unavailable storage is an error.
+   */
+  @Override
+  public void setParticipation(
+      @Nonnull final String athleteId,
+      @Nonnull final String competitionId,
+      final boolean confirmed) {
+    if (athleteRepository.findByCode(athleteId).isEmpty()) {
+      throw new NotFoundException("Athlete not found: " + athleteId);
+    }
+    final boolean inCatalog =
+        currentCatalog().items().stream()
+            .anyMatch(competition -> competition.id().equals(competitionId));
+    if (!inCatalog) {
+      throw new NotFoundException("Competition not in the current season: " + competitionId);
+    }
+
+    competitionParticipationRepository.setConfirmed(athleteId, competitionId, confirmed);
+    log.info(
+        "Participation of athlete {} in competition {} set to {}",
+        athleteId,
+        competitionId,
+        confirmed);
   }
 
   @Override
@@ -123,6 +146,18 @@ public class AthleteCompetitionUseCaseImpl
             e);
       }
     }
+  }
+
+  private SynchronizedSelection<AthleteCompetition> currentCatalog() {
+    final var season = currentSeason();
+    return competitionCatalogRepository
+        .find()
+        .filter(catalog -> catalog.season().equals(season))
+        .map(CompetitionCatalog::competitions)
+        .orElseThrow(
+            () ->
+                new DataUnavailableException(
+                    "Competitions of season " + season.start() + " not synchronized yet"));
   }
 
   private DateRange currentSeason() {

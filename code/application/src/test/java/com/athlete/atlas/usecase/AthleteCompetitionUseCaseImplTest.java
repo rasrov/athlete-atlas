@@ -3,7 +3,11 @@ package com.athlete.atlas.usecase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -22,6 +26,7 @@ import com.athlete.atlas.port.output.AthleteRepository;
 import com.athlete.atlas.port.output.CompetitionCatalogRepository;
 import com.athlete.atlas.port.output.CompetitionParticipationRepository;
 import com.athlete.atlas.port.output.CompetitionPort;
+import jakarta.annotation.Nonnull;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -35,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class AthleteCompetitionUseCaseImplTest {
 
@@ -51,6 +57,28 @@ class AthleteCompetitionUseCaseImplTest {
   private AthleteRepository athleteRepository;
 
   private CompetitionParticipationRepository participationRepository;
+
+  private static Clock at(final LocalDate today) {
+    return Clock.fixed(today.atTime(6, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
+  }
+
+  private static AthleteCompetition competition() {
+    return competition("ifbb-1");
+  }
+
+  private static AthleteCompetition competition(final String id) {
+    return new AthleteCompetition(
+        id,
+        "Example Pro",
+        LocalDate.of(2026, 11, 1),
+        LocalDate.of(2026, 11, 1),
+        "Madrid",
+        "Spain",
+        "Classic Physique",
+        URI.create("https://www.ifbbpro.com/competition/example/"),
+        "1",
+        null);
+  }
 
   @BeforeEach
   void setUp() {
@@ -219,6 +247,69 @@ class AthleteCompetitionUseCaseImplTest {
         .isEqualTo(Availability.UNKNOWN);
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void setsTheParticipationInACompetitionOfTheCurrentSeason(final boolean confirmed) {
+    when(competitionPort.fetchCompetitions(any())).thenReturn(List.of(competition("ifbb-1")));
+    final var useCase = useCaseAt(at(TODAY));
+    useCase.refresh();
+
+    useCase.setParticipation(ATHLETE_ID, "ifbb-1", confirmed);
+
+    verify(participationRepository).setConfirmed(ATHLETE_ID, "ifbb-1", confirmed);
+  }
+
+  @Test
+  void anUnknownAthleteCannotSetAParticipation() {
+    when(athleteRepository.findByCode("unknown")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> useCaseAt(at(TODAY)).setParticipation("unknown", "ifbb-1", true))
+        .isInstanceOf(NotFoundException.class);
+    verify(participationRepository, never()).setConfirmed(anyString(), anyString(), anyBoolean());
+  }
+
+  @Test
+  void aCompetitionOutsideTheCurrentCatalogIsNotFound() {
+    when(competitionPort.fetchCompetitions(any())).thenReturn(List.of(competition("ifbb-1")));
+    final var useCase = useCaseAt(at(TODAY));
+    useCase.refresh();
+
+    assertThatThrownBy(() -> useCase.setParticipation(ATHLETE_ID, "ifbb-2", true))
+        .isInstanceOf(NotFoundException.class);
+    verify(participationRepository, never()).setConfirmed(anyString(), anyString(), anyBoolean());
+  }
+
+  @Test
+  void aParticipationCannotBeSetUntilTheFirstSuccessfulRefresh() {
+    assertThatThrownBy(() -> useCaseAt(at(TODAY)).setParticipation(ATHLETE_ID, "ifbb-1", true))
+        .isInstanceOf(DataUnavailableException.class);
+    verify(participationRepository, never()).setConfirmed(anyString(), anyString(), anyBoolean());
+  }
+
+  @Test
+  void aCompetitionOfThePreviousSeasonCannotBeSet() {
+    when(competitionPort.fetchCompetitions(any())).thenReturn(List.of(competition("ifbb-1")));
+    useCaseAt(at(LocalDate.of(2026, 9, 30))).refresh();
+
+    final var nextSeason = useCaseAt(at(LocalDate.of(2026, 10, 1)));
+
+    assertThatThrownBy(() -> nextSeason.setParticipation(ATHLETE_ID, "ifbb-1", true))
+        .isInstanceOf(DataUnavailableException.class);
+  }
+
+  @Test
+  void anUnavailableStoragePropagatesWhenSettingAParticipation() {
+    when(competitionPort.fetchCompetitions(any())).thenReturn(List.of(competition("ifbb-1")));
+    final var useCase = useCaseAt(at(TODAY));
+    useCase.refresh();
+    doThrow(new StorageUnavailableException("down", null))
+        .when(participationRepository)
+        .setConfirmed(ATHLETE_ID, "ifbb-1", true);
+
+    assertThatThrownBy(() -> useCase.setParticipation(ATHLETE_ID, "ifbb-1", true))
+        .isInstanceOf(StorageUnavailableException.class);
+  }
+
   private AthleteCompetitionUseCaseImpl useCaseAt(final Clock clock) {
     return new AthleteCompetitionUseCaseImpl(
         competitionPort,
@@ -227,28 +318,6 @@ class AthleteCompetitionUseCaseImplTest {
         athleteRepository,
         participationRepository,
         clock);
-  }
-
-  private static Clock at(final LocalDate today) {
-    return Clock.fixed(today.atTime(6, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
-  }
-
-  private static AthleteCompetition competition() {
-    return competition("ifbb-1");
-  }
-
-  private static AthleteCompetition competition(final String id) {
-    return new AthleteCompetition(
-        id,
-        "Example Pro",
-        LocalDate.of(2026, 11, 1),
-        LocalDate.of(2026, 11, 1),
-        "Madrid",
-        "Spain",
-        "Classic Physique",
-        URI.create("https://www.ifbbpro.com/competition/example/"),
-        "1",
-        null);
   }
 
   private static final class InMemoryRepository implements CompetitionCatalogRepository {
@@ -261,7 +330,7 @@ class AthleteCompetitionUseCaseImplTest {
     }
 
     @Override
-    public void save(final CompetitionCatalog competitionCatalog) {
+    public void save(@Nonnull final CompetitionCatalog competitionCatalog) {
       catalog.set(competitionCatalog);
     }
   }

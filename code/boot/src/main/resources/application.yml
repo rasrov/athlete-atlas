@@ -1,3 +1,7 @@
+logging:
+  level:
+    com.athlete.atlas: DEBUG
+
 spring:
   datasource:
     # Defaults match docker-compose.yml for local development; any other environment sets them
@@ -36,6 +40,11 @@ spring:
       # Entries are evicted when the data is written; the TTL only covers changes made outside the
       # backend (e.g. SQL). recordStats exposes hits, misses and size in Prometheus.
       spec: maximumSize=500,expireAfterWrite=10m,recordStats
+
+api:
+  # Registers the write endpoints (participations). They have no authentication yet, so they stay
+  # disabled in public environments; enable them locally with API_WRITE_ENABLED=true.
+  write-enabled: ${API_WRITE_ENABLED:false}
 
 app:
   # Zone of the API contract for local dates (competition season, season-start-cron), whatever

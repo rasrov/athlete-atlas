@@ -22,14 +22,18 @@ public final class ResponseCaching {
           .staleWhileRevalidate(Duration.ofMinutes(1))
           .staleIfError(Duration.ofHours(1));
 
-  public static final CacheControl ERROR = CacheControl.noStore();
+  /**
+   * Never stored by any cache. Used for errors, degraded responses and the responses of write
+   * endpoints.
+   */
+  public static final CacheControl NO_STORE = CacheControl.noStore();
 
   /**
    * Data of unknown availability is a degraded response (e.g. the storage did not respond), so it is
    * not stored either: it would keep being served after the backend recovers.
    */
   public static CacheControl forAvailability(final Availability availability) {
-    return availability == Availability.UNKNOWN ? ERROR : PUBLIC_DATA;
+    return availability == Availability.UNKNOWN ? NO_STORE : PUBLIC_DATA;
   }
 
   private ResponseCaching() {}

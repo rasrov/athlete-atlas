@@ -23,7 +23,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -88,6 +90,23 @@ public class GlobalExceptionHandler {
     return invalidParameters(List.of(ex.getParameterName()));
   }
 
+  /** Missing, malformed or non-JSON body, or a value of the wrong type. */
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<Problem> handleNotReadable(final HttpMessageNotReadableException ex) {
+    log.debug("Unreadable request body: {}", ex.getMessage());
+    return problem(
+        HttpStatus.BAD_REQUEST, INVALID_PARAMETERS, RestClientErrorCode.BAD_REQUEST.message());
+  }
+
+  /** The contract answers 400, not 415, to a Content-Type other than application/json. */
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<Problem> handleMediaTypeNotSupported(
+      final HttpMediaTypeNotSupportedException ex) {
+    log.debug("Unsupported request Content-Type: {}", ex.getContentType());
+    return problem(
+        HttpStatus.BAD_REQUEST, INVALID_PARAMETERS, RestClientErrorCode.BAD_REQUEST.message());
+  }
+
   @ExceptionHandler(BadRequestException.class)
   public ResponseEntity<Problem> handleBadRequest(final BadRequestException ex) {
     log.debug("Bad request: {}", ex.getMessage());
@@ -148,7 +167,7 @@ public class GlobalExceptionHandler {
 
   /**
    * Any other exception. Spring MVC exceptions that already carry a status (404 for an unknown
-   * route, 405, 415...) keep it; everything else is a 500.
+   * route, 405...) keep it; everything else is a 500.
    */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Problem> handleUnexpected(final Exception ex) {
@@ -195,7 +214,7 @@ public class GlobalExceptionHandler {
   private static ResponseEntity<Problem> problem(
       final HttpStatusCode status, final String title, final String detail) {
     return ResponseEntity.status(status)
-        .cacheControl(ResponseCaching.ERROR)
+        .cacheControl(ResponseCaching.NO_STORE)
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)
         .body(new Problem(ABOUT_BLANK, title, status.value(), detail));
   }

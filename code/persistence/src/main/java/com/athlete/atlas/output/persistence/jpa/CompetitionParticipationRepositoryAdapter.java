@@ -6,6 +6,7 @@ import com.athlete.atlas.port.output.CompetitionParticipationRepository;
 import jakarta.annotation.Nonnull;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
@@ -27,5 +28,23 @@ public class CompetitionParticipationRepositoryAdapter
         () ->
             Set.copyOf(
                 competitionParticipationJpaRepository.findConfirmedCompetitionIds(athleteCode)));
+  }
+
+  /**
+   * The transaction is in the JPA repository, so the entry is evicted after the commit, and only if
+   * the write succeeded. It is evicted rather than overwritten: with two concurrent writes, writing
+   * the value could cache the one that lost in the database.
+   */
+  @Override
+  @CacheEvict(cacheNames = CacheNames.CONFIRMED_COMPETITIONS, key = "#athleteCode")
+  public void setConfirmed(
+      @Nonnull final String athleteCode,
+      @Nonnull final String competitionId,
+      final boolean confirmed) {
+    StorageCalls.call(
+        () ->
+            confirmed
+                ? competitionParticipationJpaRepository.confirm(athleteCode, competitionId)
+                : competitionParticipationJpaRepository.withdraw(athleteCode, competitionId));
   }
 }
