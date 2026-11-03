@@ -1,24 +1,23 @@
 package com.athlete.atlas.output.persistence.content;
 
-import com.fasterxml.jackson.core.JacksonException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.util.List;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * JSON format of the stored items. It has its own ObjectMapper, so that a change of the web
  * configuration of Jackson does not change the stored format: dates as ISO text, unknown fields
- * ignored so that removing a field does not invalidate the stored data.
+ * ignored so that removing a field does not invalidate the stored data. Both are set explicitly,
+ * even when they match the Jackson defaults, so that a Jackson upgrade cannot change them.
  */
 final class ContentJson {
 
   private static final ObjectMapper MAPPER =
       JsonMapper.builder()
-          .addModule(new JavaTimeModule())
-          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+          .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
           .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
           .build();
 
@@ -36,7 +35,7 @@ final class ContentJson {
   /**
    * @throws JacksonException if the JSON does not have the expected format.
    */
-  static <S> List<S> readList(final String json, final Class<S> type) throws JacksonException {
+  static <S> List<S> readList(final String json, final Class<S> type) {
     return MAPPER.readValue(json, MAPPER.getTypeFactory().constructCollectionType(List.class, type));
   }
 }

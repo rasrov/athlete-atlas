@@ -15,9 +15,7 @@ import com.athlete.atlas.output.rest.instagram.mapper.InstagramPostMapper;
 import com.athlete.atlas.output.rest.instagram.mapper.InstagramPostValues;
 import com.athlete.atlas.port.output.InstagramPort;
 import com.athlete.atlas.service.InvokerService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.time.Clock;
 import java.time.Instant;
@@ -33,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Selects the latest posts of an Instagram profile with a single Business Discovery request (no
@@ -180,7 +179,7 @@ public class InstagramAdapter implements InstagramPort {
       return Optional.ofNullable(
               objectMapper.readValue(e.getResponseBodyAsByteArray(), GraphErrorResponse.class))
           .map(GraphErrorResponse::getError);
-    } catch (final IOException | RuntimeException parseError) {
+    } catch (final RuntimeException parseError) {
       return Optional.empty();
     }
   }

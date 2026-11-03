@@ -49,8 +49,8 @@ class IfbbEventsClientResilienceTest {
   @SpringBootConfiguration
   @ImportAutoConfiguration({
     AopAutoConfiguration.class,
-    io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration.class,
-    io.github.resilience4j.springboot3.circuitbreaker.autoconfigure.CircuitBreakerAutoConfiguration
+    io.github.resilience4j.springboot.retry.autoconfigure.RetryAutoConfiguration.class,
+    io.github.resilience4j.springboot.circuitbreaker.autoconfigure.CircuitBreakerAutoConfiguration
         .class
   })
   @Import(IfbbEventsClient.class)
