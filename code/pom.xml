@@ -79,6 +79,26 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+            <!-- Loads Mockito as a Java agent: dynamic agent loading will be disallowed by default
+                 in a future JDK. The properties goal resolves ${org.mockito:mockito-core:jar}. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+            </plugin>
         </plugins>
         <pluginManagement>
             <plugins>
