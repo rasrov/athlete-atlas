@@ -33,9 +33,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.aop.AopAutoConfiguration;
-import org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration;
-import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration;
+import org.springframework.boot.http.converter.autoconfigure.HttpMessageConvertersAutoConfiguration;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.restclient.autoconfigure.RestClientAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -99,7 +99,7 @@ class InstagramAdapterTest {
     JacksonAutoConfiguration.class,
     HttpMessageConvertersAutoConfiguration.class,
     RestClientAutoConfiguration.class,
-    io.github.resilience4j.springboot3.retry.autoconfigure.RetryAutoConfiguration.class
+    io.github.resilience4j.springboot.retry.autoconfigure.RetryAutoConfiguration.class
   })
   @Import({
     InstagramClientConfiguration.class,

@@ -127,7 +127,7 @@ public class GlobalExceptionHandler {
   public ResponseEntity<Problem> handleUnprocessableEntity(final UnprocessableEntityException ex) {
     log.debug("Unprocessable entity: {}", ex.getMessage());
     return problem(
-        HttpStatus.UNPROCESSABLE_ENTITY,
+        HttpStatus.UNPROCESSABLE_CONTENT,
         "Unprocessable entity",
         RestClientErrorCode.UNPROCESSABLE_ENTITY.message());
   }

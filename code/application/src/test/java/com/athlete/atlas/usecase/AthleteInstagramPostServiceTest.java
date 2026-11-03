@@ -17,6 +17,7 @@ import com.athlete.atlas.model.instagram.InstagramPost;
 import com.athlete.atlas.model.selection.SynchronizedSelection;
 import com.athlete.atlas.port.output.InstagramPort;
 import com.athlete.atlas.port.output.InstagramPostSelectionRepository;
+import jakarta.annotation.Nonnull;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -29,7 +30,6 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.lang.NonNull;
 
 /**
  * The selection rules shared with YouTube are covered in depth by AthleteYouTubeVideoServiceTest;
@@ -123,12 +123,12 @@ class AthleteInstagramPostServiceTest {
     private final Map<String, SynchronizedSelection<InstagramPost>> selections = new HashMap<>();
 
     @Override
-    public Optional<SynchronizedSelection<InstagramPost>> findByAthleteId(@NonNull final String athleteId) {
+    public Optional<SynchronizedSelection<InstagramPost>> findByAthleteId(@Nonnull final String athleteId) {
       return Optional.ofNullable(selections.get(athleteId));
     }
 
     @Override
-    public void save(@NonNull final String athleteId, @NonNull final SynchronizedSelection<InstagramPost> selection) {
+    public void save(@Nonnull final String athleteId, @Nonnull final SynchronizedSelection<InstagramPost> selection) {
       selections.put(athleteId, selection);
     }
   }

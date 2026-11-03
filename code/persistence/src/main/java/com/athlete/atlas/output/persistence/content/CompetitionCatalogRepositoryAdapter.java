@@ -6,7 +6,6 @@ import com.athlete.atlas.model.competition.DateRange;
 import com.athlete.atlas.model.selection.SynchronizedSelection;
 import com.athlete.atlas.output.persistence.StorageCalls;
 import com.athlete.atlas.port.output.CompetitionCatalogRepository;
-import com.fasterxml.jackson.core.JacksonException;
 import jakarta.annotation.Nonnull;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
 
 /**
  * Stores the competition catalog in competition_catalog, one row per season, and serves the latest

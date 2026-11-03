@@ -5,7 +5,7 @@ import com.athlete.atlas.output.rest.instagram.generated.api.InstagramGraphApi;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
+import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
@@ -23,7 +23,7 @@ public class InstagramClientConfiguration {
     final var requestFactory =
         ClientHttpRequestFactoryBuilder.detect()
             .build(
-                ClientHttpRequestFactorySettings.defaults()
+                HttpClientSettings.defaults()
                     .withConnectTimeout(instagramClientProperties.connectTimeout())
                     .withReadTimeout(instagramClientProperties.readTimeout()));
     final var restClient = restClientBuilder.requestFactory(requestFactory).build();
